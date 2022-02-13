@@ -1,0 +1,77 @@
+#pragma once
+
+#ifndef __RM200X_FRAME_H__
+#define __RM200X_FRAME_H__
+
+//STANDARD IO Headers
+#include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <string.h>
+
+//FREERTOS Headers
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
+#include "freertos/queue.h"
+
+//ESP Headers
+#include "esp_log.h"
+
+//Base Headers
+#include "base/rm200x_uart.h"
+
+//Application Headers
+#include "App/rm200x_ack.h"
+
+//Types
+typedef union
+{
+  struct
+  {
+    unsigned char bit0 : 1;
+    unsigned char bit1 : 1;
+    unsigned char bit2 : 1;
+    unsigned char bit3 : 1;
+    unsigned char bit4 : 1;
+    unsigned char bit5 : 1;
+    unsigned char bit6 : 1;
+    unsigned char bit7 : 1;
+  }bits;
+  unsigned char byte;
+}byte;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+//FREERTOS CONTROL ITEMS
+
+//Task Tags
+extern const char *FRAME_TASK_TAG;
+
+//defines and constants
+//#define N_ELEMS(x)  (sizeof(x) / sizeof((x)[0]))
+
+
+
+//Enumerations
+
+//Prototypes
+uint8_t RollingCounter(void);
+uint8_t Get_Frame_Length (const uint8_t *pt_frame_array);
+uint8_t Get_Frame_CRC (const uint8_t *pt_frame_array);
+uint8_t Get_Frame_Payload (const uint8_t *pt_frame_array);
+uint8_t Get_Frame_Intent (const uint8_t *pt_frame_array);
+
+uint8_t Calculate_Checksum(const uint8_t *pt_frame_array);
+uint8_t CheckFrame(const uint8_t *pt_frame_array);
+
+int CreateFrame(uint8_t *pt_frame, const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data);
+
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
+
+#endif  /*  __RM200X_FRAME_H__  */

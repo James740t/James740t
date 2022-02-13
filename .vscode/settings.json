@@ -1,0 +1,15 @@
+{
+    "files.associations": {
+        "*.json": "jsonc",
+        "*.ipp": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c",
+        "cstdio": "c",
+        "fstream": "c",
+        "sstream": "c",
+        "freertosconfig.h": "c",
+        "rm200x_gpio.h": "c",
+        "rm200x_uart.h": "c"
+    }
+}

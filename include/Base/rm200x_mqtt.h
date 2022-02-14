@@ -57,7 +57,7 @@ extern const char *MQTT_TX_TASK_TAG;
 #define MQTT_TOPIC_MAX_DEPTH    5       // The maximum number of / separated topic items
 #define MQTT_DATA_MAX_LEN       1024    // Artificial limit - reduce to suit application
 #define MQTT_MESSAGE_MAX_LEN    1088    // DATA length + TOPIC length - Artificial limit - reduce to suit application
-#define MQTT_Q_DEPTH            32      // RX and Tx buffer queue depths
+#define MQTT_Q_DEPTH            16      // RX and Tx buffer queue depths
 
 //TYPE DEFINITIONS
 typedef struct st_MQTT_TOPIC mqtt_topic_t;
@@ -93,12 +93,14 @@ struct st_MQTT_MESSAGE
 #define MQTT_CMND_PREFIX        "cmnd"              //input command topic prefix
 #define MQTT_COMM_PREFIX        "comm"              //Direct payload to the COM port 
 #define MQTT_HEX_COMM_PREFIX    "comm_h"            //Direct payload to the COM port via a HEX parser
+#define MQTT_HEX_FRAME_PREFIX   "frame"             //Direct payload to the COM port via a HEX parser - intended for RM200x
 #define MQTT_HEX_SOCKET_PREFIX  "socket"            //Direct payload to the tcpip socket
 #define MQTT_COMMAND_TOPIC      "/cmnd/rm200x/"     //Short-cut used for core subscription
 #define MQTT_TELE_PREFIX        "tele"              //output telemetery topic prefix
 #define MQTT_STATUS_PREFIX      "status"            //output status topic prefix
 #define MQTT_TELE_SUFFIX        ""                  //topic suffix if needed
 #define MQTT_BASE_TOPIC         "rm200x"            //basic topic
+#define MQTT_RADIO_SUFFIX       "radio"             //radio telemetry suffix (ASCII - think JSON)
 
 #define MQTT_DATA               "data"              //I/O data topic (see formal description of its payload - RM200x UART Protocol)
 

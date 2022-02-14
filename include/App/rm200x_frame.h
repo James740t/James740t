@@ -24,6 +24,7 @@
 //Application Headers
 #include "App/rm200x_frame_definitions.h"
 #include "App/rm200x_ack.h"
+#include "App/rm200x_radio_status.h"
 
 //FREERTOS CONTROL ITEMS
 #define INCLUDE_vTaskSuspend    1
@@ -31,12 +32,14 @@
 extern TaskHandle_t xHandle_Frame_Rx;
 
 extern QueueHandle_t xqFrame_Rx;
+extern QueueHandle_t xqFrame_Process;
 
 //Definitions
 #define FRAME_PORT              UART_NUM_2
 
 #define FRAME_BUFFER_SIZE       136
-#define FRAME_QUEUE_DEPTH       16
+#define FRAME_QUEUE_DEPTH       8
+#define FRAME_PROCESSOR_DEPTH   16
 
 //Types
 //typedef struct uart_message_t uart_message_t;

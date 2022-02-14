@@ -39,7 +39,7 @@ void app_main() //Called from an "internal" main.c
     // WIFI Module
 	esp_log_level_set(WIFI_TAG, ESP_LOG_NONE);
     // MQTT Module
-	esp_log_level_set(MQTT_RX_TASK_TAG, ESP_LOG_NONE);
+	esp_log_level_set(MQTT_RX_TASK_TAG, ESP_LOG_INFO);
     esp_log_level_set(MQTT_TX_TASK_TAG, ESP_LOG_NONE);
     // UART Module
 	esp_log_level_set(TX_TASK_TAG, ESP_LOG_NONE);

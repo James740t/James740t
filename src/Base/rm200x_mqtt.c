@@ -383,21 +383,6 @@ void mqtt_rx_task(void *arg)
     // MQTT IO buffer Queue
     xqMQTT_rx_Messages = xQueueCreate(MQTT_Q_DEPTH, sizeof(_mqtt_rx));
 
-    // //wait for all required tasks to come online
-    // while (
-    //            (xqMQTT_tx_Messages == NULL)
-    //         || (xqMQTT_rx_Messages == NULL)
-    //         || (xHandle_uart_tx == NULL) 
-    //     //    || (xHandle_uart_rx == NULL) 
-    //         || (xHandle_uart_isr == NULL)
-    //         || (xHandle_blink == NULL)
-    //       )
-    // {
-    //     // wait 1 second then check again
-    //     vTaskDelay(100 / portTICK_PERIOD_MS);
-    // }
-
-    // Task Loop - only run if there is a good message queue
     while (1)
     {
         //Clear the MQTT message holder ready for a new message
@@ -420,9 +405,38 @@ void mqtt_rx_task(void *arg)
             /**************************************************************************************************/
             if (strstr((char *)&mqtt_rx->topic_detail.topic, MQTT_CMND_PREFIX) != NULL)
             {
-                printf("COMMAND\r\n");
+                ESP_LOGI(MQTT_RX_TASK_TAG, "COMMAND");
                 CommandProcessor(mqtt_rx);
                 //Reply will be in the form of a status message
+                continue;
+            }
+            /**************************************************************************************************/
+            /*  DO SOMETHING WITH THE RECEIVED FRAME HEX MESSAGE                                               */
+            /**************************************************************************************************/
+            if (strcmp((char *)&mqtt_rx->topic_detail.prefix, MQTT_HEX_FRAME_PREFIX) == 0)
+            {
+                ESP_LOGI(MQTT_RX_TASK_TAG, "COMM PORT TX - FRAME");
+                // Send a copy of the MQTT message out on the UART
+                static uart_message_t uart_tx_msg;
+                memset(&uart_tx_msg, 0, sizeof(uart_message_t));
+
+                uart_tx_msg.Message_ID = mqtt_rx->msg_id;
+                uart_tx_msg.port = EX_UART_NUM;
+                uart_tx_msg.IsHEX = true;           // TREAT DATA AS HEX
+                uart_tx_msg.IsASCII = true;         // It IS an ASCII representation of HEX
+                uart_tx_msg.IsFrame = true;
+                int len = strlen(mqtt_rx->data);
+                if (len > UART_BUFFER_SIZE)
+                {
+                    uart_tx_msg.length = UART_BUFFER_SIZE; //(int)sizeof(uart_tx_msg.data);
+                }
+                else
+                {
+                    uart_tx_msg.length = len;
+                }
+                memcpy(&uart_tx_msg.data, mqtt_rx->data, uart_tx_msg.length); // Only copy what will fit...
+                // Place our data on the UART tx queue
+                xQueueSend(xqUART_tx, &uart_tx_msg, (TickType_t)0);
                 continue;
             }
             /**************************************************************************************************/
@@ -430,7 +444,7 @@ void mqtt_rx_task(void *arg)
             /**************************************************************************************************/
             if (strcmp((char *)&mqtt_rx->topic_detail.prefix, MQTT_HEX_COMM_PREFIX) == 0)
             {
-                printf("COMM PORT TX - HEX\r\n");
+                ESP_LOGI(MQTT_RX_TASK_TAG, "COMM PORT TX - HEX");
                 // Send a copy of the MQTT message out on the UART
                 static uart_message_t uart_tx_msg;
                 memset(&uart_tx_msg, 0, sizeof(uart_message_t));
@@ -451,13 +465,14 @@ void mqtt_rx_task(void *arg)
                 memcpy(&uart_tx_msg.data, mqtt_rx->data, uart_tx_msg.length); // Only copy what will fit...
                 // Place our data on the UART tx queue
                 xQueueSend(xqUART_tx, &uart_tx_msg, (TickType_t)0);
+                continue;
             }
             /**************************************************************************************************/
             /*  DO SOMETHING WITH THE RECEIVED COMM MESSAGE                                                   */
             /**************************************************************************************************/
             if (strcmp((char *)&mqtt_rx->topic_detail.prefix, MQTT_COMM_PREFIX) == 0)
             {
-                printf("COM PORT TX - ASCII\r\n");
+                ESP_LOGI(MQTT_RX_TASK_TAG, "COM PORT TX - ASCII");
                 // Send a copy of the MQTT message out on the UART
                 static uart_message_t uart_tx_msg;
                 memset(&uart_tx_msg, 0, sizeof(uart_message_t));
@@ -478,13 +493,14 @@ void mqtt_rx_task(void *arg)
                 memcpy(&uart_tx_msg.data, mqtt_rx->data, uart_tx_msg.length); // Only copy what will fit...
                 // Place our data on the UART tx queue
                 xQueueSend(xqUART_tx, &uart_tx_msg, (TickType_t)0);
+                continue;
             }
             /**************************************************************************************************/
             /*  DO SOMETHING WITH THE RECEIVED SOCKET MESSAGE                                                 */
             /**************************************************************************************************/
             if (strcmp((char *)&mqtt_rx->topic_detail.prefix, MQTT_HEX_SOCKET_PREFIX) == 0)
             {
-                printf("COMMAND SOCKET TX\r\n");
+                ESP_LOGI(MQTT_RX_TASK_TAG, "COMMAND SOCKET TX");
                 // Send a copy of the MQTT message out on the SOCKET
                 static uart_message_t uart_tx_msg;
                 memset(&uart_tx_msg, 0, sizeof(uart_message_t));
@@ -506,6 +522,7 @@ void mqtt_rx_task(void *arg)
                 // Place our data on the UART tx queue
 
                 // TBD
+                continue;
             }
         }
 #ifdef STACK_MONITOR
@@ -537,21 +554,6 @@ void mqtt_tx_task(void *arg)
     // MQTT IO buffer Queue
     xqMQTT_tx_Messages = xQueueCreate(MQTT_Q_DEPTH, sizeof(_mqtt_tx));
 
-    // //wait for all required tasks to come online
-    // while (
-    //            (xqMQTT_tx_Messages == NULL)
-    //         || (xqMQTT_rx_Messages == NULL)
-    //         || (xHandle_uart_tx == NULL) 
-    //     //    || (xHandle_uart_rx == NULL) 
-    //         || (xHandle_uart_isr == NULL)
-    //         || (xHandle_blink == NULL)
-    //         || (xqMQTT_rx_Messages == NULL)
-    //       )
-    // {
-    //     // wait 1 second then check again
-    //     vTaskDelay(100 / portTICK_PERIOD_MS);
-    // }
-
     char ip_addr[32];
     sprintf((char *)&ip_addr, "IP Address: " IPSTR, IP2STR(&RM_IP.ip));
     //Send a running message out (hard coded) now: 
@@ -559,7 +561,6 @@ void mqtt_tx_task(void *arg)
     strcat((char *)&mqtt_tx->data, ip_addr);
     esp_mqtt_client_publish(mqtt_client, "/status/rm200x/", mqtt_tx->data, 0, 0, 0);
 
-    // Task Loop - only run if there is a good message queue
     while (1)
     {
         //Clear the input holder for a new message

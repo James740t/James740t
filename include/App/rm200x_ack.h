@@ -52,7 +52,7 @@ struct ack_message_t
 #define ACK_PORT                FRAME_PORT
 
 #define ACK_BUFFER_SIZE         FRAME_BUFFER_SIZE
-#define ACK_QUEUE_DEPTH         FRAME_QUEUE_DEPTH
+#define ACK_QUEUE_DEPTH         (FRAME_QUEUE_DEPTH / 2)
 #define ACK_FRAME_LENGTH        8
 
 //Task Tags

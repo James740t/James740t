@@ -8,6 +8,7 @@
 TaskHandle_t xHandle_Frame_Rx = NULL;
 
 QueueHandle_t xqFrame_Rx = NULL;
+QueueHandle_t xqFrame_Process = NULL;
 
 //Task Tags
 const char *FRAME_TASK_TAG = "FRAME_TASK";
@@ -16,7 +17,7 @@ const char *FRAME_TASK_TAG = "FRAME_TASK";
 
 //Local prototypes
 
-#define STACK_MONITOR   true
+#define STACK_MONITOR   false
 #if STACK_MONITOR
 UBaseType_t uxHighWaterMark_RX;
 UBaseType_t uxHighWaterMark_TX;
@@ -117,8 +118,8 @@ uint8_t CheckFrame(const uint8_t *pt_frame_array)
     uint8_t crc_in = pt_frame_array[crc_idx];
     uint8_t crc_calc = Calculate_Checksum(pt_frame_array);
 
-    ESP_LOGI(FRAME_TASK_TAG, "Pay. Len: 0x%02X, Msg. Len:: 0x%02X", length_in, crc_idx + 1);
-    ESP_LOGI(FRAME_TASK_TAG, "CRC in: 0x%02X, CRC calc: 0x%02X", crc_in, crc_calc);
+    //ESP_LOGI(FRAME_TASK_TAG, "Pay. Len: 0x%02X, Msg. Len:: 0x%02X", length_in, crc_idx + 1);
+    //ESP_LOGI(FRAME_TASK_TAG, "CRC in: 0x%02X, CRC calc: 0x%02X", crc_in, crc_calc);
 
     if (crc_in != crc_calc) error.bits.bit2 = 1;
 
@@ -196,15 +197,18 @@ void init_rm200x_application(void)
 {
     // SETUP REPORTING LEVELS
     // Frame Module
-    esp_log_level_set(FRAME_TASK_TAG, ESP_LOG_INFO);
+    esp_log_level_set(FRAME_TASK_TAG, ESP_LOG_NONE);
     // ACK Module
-    esp_log_level_set(ACK_REPLY_TASK_TAG, ESP_LOG_WARN);
-    esp_log_level_set(ACK_PROCESS_TASK_TAG, ESP_LOG_WARN);
-
+    esp_log_level_set(ACK_REPLY_TASK_TAG, ESP_LOG_NONE);
+    esp_log_level_set(ACK_PROCESS_TASK_TAG, ESP_LOG_NONE);
+    // Audio Module
+    esp_log_level_set(AUDIO_TASK_TAG, ESP_LOG_INFO);
 
     // SETUP ALL QUEUES
     // Setup the frame Queue - to be used after ACK has been sent
     xqFrame_Rx = xQueueCreate(FRAME_QUEUE_DEPTH, sizeof(uint8_t) * FRAME_BUFFER_SIZE);
+    // Frame processing queue - long
+    xqFrame_Process = xQueueCreate(FRAME_PROCESSOR_DEPTH, sizeof(uint8_t) * FRAME_BUFFER_SIZE);
     // ACK receive buffer Queue
     xqACK_Send_Reply = xQueueCreate(ACK_QUEUE_DEPTH, sizeof(uint8_t) * ACK_BUFFER_SIZE);
     // ACK receive buffer Queue
@@ -215,14 +219,22 @@ void init_rm200x_application(void)
 
     //TASKS
     // Frame marshalling
-    xTaskCreate(process_Frame_task, FRAME_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_Frame_Rx);
+    xTaskCreate(process_Frame_task, FRAME_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES - 10, &xHandle_Frame_Rx);
+    configASSERT(xHandle_Frame_Rx);
 
     // ACK in Process Task - ACK reply pumped out onto a queue
-    xTaskCreate(process_ACK_task, ACK_PROCESS_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_ACK_Process);
+    xTaskCreate(process_ACK_task, ACK_PROCESS_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES - 8, &xHandle_ACK_Process);
+    configASSERT(xHandle_ACK_Process);
 
     // ACK Reply Task - held with ACK Queue until data is available
-    xTaskCreate(reply_ACK_task, ACK_REPLY_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_ACK_Reply);
+    xTaskCreate(reply_ACK_task, ACK_REPLY_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES - 9, &xHandle_ACK_Reply);
+    configASSERT(xHandle_ACK_Reply);
 
+    // Audio In Task - Process audio parameters
+    xTaskCreate(audio_IN_task, AUDIO_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES - 7, &xHandle_Audio_in_task);
+    configASSERT(xHandle_Audio_in_task);
+
+    
 }
 
 /******************************************************************************************/
@@ -261,23 +273,25 @@ void process_Frame_task(void *arg)
         // Block until a message is put on the queue
         if (xQueueReceive(xqFrame_Rx, frame_in_buffer, (TickType_t)portMAX_DELAY) == pdPASS)
         {
+            ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_WARN);
+
+            // Copy the incomming buffer
+            memcpy(frame_ack_buffer, frame_in_buffer, sizeof(_frame_in_buffer));
+            memcpy(frame_out_buffer, frame_in_buffer, sizeof(_frame_in_buffer));
+
+            // Get incomming intent:
+            uint8_t intent = Get_Frame_Intent(frame_in_buffer);
+
+            // It is a normal incomming message so we need to ACK it
+            if (intent != CMD_ACK)
+            {
+                // ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, frame_ack_buffer, Get_Frame_Length(frame_ack_buffer), ESP_LOG_WARN);
+                xQueueSend(xqACK_Send_Reply, frame_ack_buffer, (TickType_t)0);
+            }
+
             if (CheckFrame(frame_in_buffer) == 0x00) // Frame is good
             {
-                ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_WARN);
-
-                // Copy the incomming buffer
-                memcpy(frame_ack_buffer, frame_in_buffer, sizeof(_frame_in_buffer));
-                memcpy(frame_out_buffer, frame_in_buffer, sizeof(_frame_in_buffer));
-
-                // Get incomming intent:
-                uint8_t intent = Get_Frame_Intent(frame_in_buffer);
-
-                // It is a normal incomming message so we need to ACK it
-                if (intent != CMD_ACK)
-                {
-                    // ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, frame_ack_buffer, Get_Frame_Length(frame_ack_buffer), ESP_LOG_WARN);
-                    xQueueSend(xqACK_Send_Reply, frame_ack_buffer, (TickType_t)0);
-                }
+                
 /******************************************************************************************************************************************/
                 // Process the incomming intents i.e. do stuff with the data received
 /******************************************************************************************************************************************/
@@ -289,10 +303,12 @@ void process_Frame_task(void *arg)
                     xQueueSend(xqACK_Process, frame_ack_buffer, (TickType_t)0);
                     break;
                 }
-                case CMD_AUDIO:
+                case CMD_AUDIO:         // Volume and Mute status
+                case CMD_EQ:            // Tone Controls
+                case CMD_POWER_STATE:   // Power status
+                // INSERT HERE
                 {
-                    // Volume and Mute status
-                    ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_INFO);
+                    xQueueSend(xqFrame_Process, frame_out_buffer, (TickType_t)0);
                     break;
                 }
 

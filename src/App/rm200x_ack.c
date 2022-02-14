@@ -221,7 +221,6 @@ void process_ACK_task(void *arg)
                 
                 // Send out to the response Queue
                 xQueueSend(xqACK_Response, rx_ack, (TickType_t)0);
-
                 ESP_LOGW(ACK_PROCESS_TASK_TAG, "Counter: 0x%02X, Intent: 0x%02X, Status: 0x%02X", rx_ack->Counter, rx_ack->Intent, rx_ack->Status);
             }
 

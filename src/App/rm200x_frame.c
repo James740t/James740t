@@ -5,11 +5,35 @@
 /******************************************************************************************/
 
 //FREERTOS CONTROL ITEMS
+TaskHandle_t xHandle_Frame_Rx = NULL;
+
+QueueHandle_t xqFrame_Rx = NULL;
 
 //Task Tags
 const char *FRAME_TASK_TAG = "FRAME_TASK";
 
+// Globals
+
 //Local prototypes
+void process_Frame_task(void *arg);
+
+#define STACK_MONITOR   true
+#if STACK_MONITOR
+UBaseType_t uxHighWaterMark_RX;
+UBaseType_t uxHighWaterMark_TX;
+UBaseType_t uxHighWaterMark_EV;
+#endif
+
+        // #if STACK_MONITOR
+        //     /* Inspect our own high water mark on entering the task. */
+        //     uxHighWaterMark_RX = uxTaskGetStackHighWaterMark( NULL );
+        //     printf("MQTT RX STACK HW (START) = %d\r\n", uxHighWaterMark_RX);
+        // #endif
+
+        // #if STACK_MONITOR
+        //     uxHighWaterMark_RX = uxTaskGetStackHighWaterMark( NULL );
+        //     printf("MQTT RX STACK HW (RUN): %d\r\n", uxHighWaterMark_RX);
+        // #endif
 
 /******************************************************************************************/
 // RM200x FRAME - Definitions
@@ -131,24 +155,24 @@ uint8_t CreateFrame(uint8_t *pt_frame, const uint8_t pt_intent, const uint8_t da
 uint8_t CreateSendFrame(const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data)
 {
     static uint8_t _frame[FRAME_FRAME_LENGTH];
-    static uart_message_t *frame;
+    static uint8_t *frame  = (uint8_t *)&_frame;;
     memset(frame, 0x00, sizeof(_frame));
 
     static uart_message_t _frm_message;
-    static uart_message_t *frm_message;
+    static uart_message_t *frm_message = &_frm_message;
     memset(frm_message, 0x00, sizeof(_frm_message));
 
     uint8_t test = CreateFrame(frame, pt_intent, data_size, pt_data);
 
-    if (test == e_ACK_Response.SUCCESS)
+    if (test == ACK_SUCCESS)
     {
         // Build a UART message to queue
         frm_message->IsFrame = true;
         frm_message->IsASCII = false;
         frm_message->IsHEX = true;
         frm_message->port = FRAME_PORT;
-        frm_message->length = Get_Frame_Length(frame);
-        frm_message->Message_ID = Get_Rolling_Counter(frame);
+        frm_message->length = (uint16_t)Get_Frame_Length(frame);
+        frm_message->Message_ID = (int)Get_Rolling_Counter(frame);
         memcpy(&(frm_message->data), frame, frm_message->length);
 
         // Check the frame
@@ -169,7 +193,101 @@ uint8_t CreateSendFrame(const uint8_t pt_intent, const uint8_t data_size, const 
 // RM200x FRAME BUILDING  -- END --
 /*****************************************************************************/
 
+void init_Frames(void)
+{
+    // Initialise things here - startup
 
+    // wait for all required tasks to come online
+    while (
+        // UART is all running
+        (xqUART_tx == NULL) || (xqUART_rx == NULL) || (xHandle_uart_tx == NULL) || (xHandle_uart_rx == NULL) || (xHandle_uart_isr == NULL))
+    {
+        // wait 100ms then check again
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+
+    // Start the tasks running here:
+    // ACK in Process Task - ACK reply pumped out onto a queue
+    xTaskCreate(process_Frame_task, FRAME_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_Frame_Rx);
+    // Wait a shor time before starting the next task - they depend on each other...
+    //vTaskDelay(250 / portTICK_PERIOD_MS);
+}
+
+/******************************************************************************************/
+// FRAME RX TASK
+/******************************************************************************************/
+
+void process_Frame_task(void *arg)
+{
+#if STACK_MONITOR
+    /* Inspect our own high water mark on entering the task. */
+    uxHighWaterMark_RX = uxTaskGetStackHighWaterMark(NULL);
+    printf("FRAME PROCESS STACK HW (START) = %d\r\n", uxHighWaterMark_RX);
+#endif
+
+    // Initialise things here
+    static uint8_t _frame_in_buffer[FRAME_BUFFER_SIZE];
+    static uint8_t *frame_in_buffer = _frame_in_buffer;
+    memset(frame_in_buffer, 0x00, sizeof(_frame_in_buffer));
+
+    // Setup the frame Queue - to be used after ACK has been sent
+    xqFrame_Rx = xQueueCreate(FRAME_QUEUE_DEPTH, sizeof(uint8_t) * FRAME_FRAME_LENGTH);
+
+    //Wait for Queues to be online
+    while (
+        // Make sure all Queues are running
+        (xqACK_Send_Reply == NULL) || (xqFrame_Rx == NULL) || (xqACK_Response == NULL))
+    {
+        // wait 100ms then check again
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+
+    // Task loop
+    while (1)
+    {
+        // Clear stuff here ready for a new input message
+        memset(frame_in_buffer, 0x00, sizeof(_frame_in_buffer));
+
+        // Block until a message is put on the queue
+        if (xQueueReceive(xqFrame_Rx, frame_in_buffer, (TickType_t)portMAX_DELAY) == pdPASS)
+        {
+            // Send it to be ACK'ed
+            xQueueSend(xqACK_Send_Reply, frame_in_buffer, (TickType_t)0);
+
+            ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_WARN);
+
+            //Get incomming intent:
+            uint8_t intent = Get_Frame_Intent(frame_in_buffer);
+            // Do stuff with the data received
+            switch (intent)
+            {
+                case CMD_AUDIO:
+                {
+                    ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_INFO);
+                    break;
+                }
+
+
+
+                default:
+                {
+                    // do nothing
+                    break;
+                }
+            }
+
+
+
+#if STACK_MONITOR
+            uxHighWaterMark_RX = uxTaskGetStackHighWaterMark(NULL);
+            printf("FRAME PROCESS STACK HW (RUN): %d\r\n", uxHighWaterMark_RX);
+#endif
+        }
+    }
+
+    free(xqFrame_Rx);
+    vTaskDelete(xHandle_Frame_Rx);
+}
 
 /******************************************************************************************/
 // RM200x FRAME -- END --

@@ -52,7 +52,7 @@ void app_main() //Called from an "internal" main.c
 
     /***  START THE APPLICATION HERE  ***/
     // Frame Module
-    esp_log_level_set(FRAME_TASK_TAG, ESP_LOG_NONE);
+    esp_log_level_set(FRAME_TASK_TAG, ESP_LOG_INFO);
     // ACK Module
     esp_log_level_set(ACK_REPLY_TASK_TAG, ESP_LOG_NONE);
     esp_log_level_set(ACK_PROCESS_TASK_TAG, ESP_LOG_NONE);
@@ -84,7 +84,10 @@ void app_main() //Called from an "internal" main.c
     #endif
 
     //APPLICATION TASKS
+    
     init_ack();
+
+    init_Frames();
 
     //fs_test();
     //fs_finalise();

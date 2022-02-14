@@ -467,8 +467,8 @@ void rx_uart_task(void *arg)
             if (rx_message->IsFrame)
             {
                 //Deal with the incomming frame
-                // Send it to be ACK'ed
-                xQueueSend(xqACK_Send_Reply, &(rx_message->data), (TickType_t)0);
+                xQueueSend(xqFrame_Rx, &(rx_message->data), (TickType_t)0);
+                
                 // Flash LED to show activity
                 xSemaphoreGive(bin_s_sync_blink_task);
 

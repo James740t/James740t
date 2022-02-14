@@ -22,6 +22,7 @@
 #include "Base/rm200x_uart.h"
 
 //Application Headers
+#include "App/rm200x_frame_definitions.h"
 #include "rm200x_frame.h"
 
 #ifdef __cplusplus
@@ -47,11 +48,9 @@ struct ack_message_t
     uint8_t Status;
 };
 
-extern e_ACK_Response;
-
 #define ACK_PORT                FRAME_PORT
 
-#define ACK_BUFFER_SIZE         256
+#define ACK_BUFFER_SIZE         FRAME_BUFFER_SIZE
 #define ACK_QUEUE_DEPTH         16
 #define ACK_FRAME_LENGTH        8
 

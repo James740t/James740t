@@ -47,7 +47,9 @@ struct ack_message_t
     uint8_t Status;
 };
 
-#define ACK_PORT                UART_NUM_2
+extern e_ACK_Response;
+
+#define ACK_PORT                FRAME_PORT
 
 #define ACK_BUFFER_SIZE         256
 #define ACK_QUEUE_DEPTH         16

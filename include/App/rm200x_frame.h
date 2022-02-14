@@ -24,7 +24,17 @@
 //Application Headers
 #include "App/rm200x_ack.h"
 
+//Definitions
+#define FRAME_PORT              UART_NUM_2
+
+#define FRAME_BUFFER_SIZE       256
+#define FRAME_QUEUE_DEPTH       16
+#define FRAME_FRAME_LENGTH      256
+
 //Types
+//typedef struct uart_message_t uart_message_t;
+//typedef struct ack_message_t ack_message_t;
+
 typedef union
 {
   struct
@@ -53,21 +63,21 @@ extern const char *FRAME_TASK_TAG;
 //defines and constants
 //#define N_ELEMS(x)  (sizeof(x) / sizeof((x)[0]))
 
-
-
 //Enumerations
 
 //Prototypes
-uint8_t RollingCounter(void);
+uint8_t CreateRollingCounter(void);
 uint8_t Get_Frame_Length (const uint8_t *pt_frame_array);
 uint8_t Get_Frame_CRC (const uint8_t *pt_frame_array);
 uint8_t Get_Frame_Payload (const uint8_t *pt_frame_array);
 uint8_t Get_Frame_Intent (const uint8_t *pt_frame_array);
+uint8_t Get_Rolling_Counter (const uint8_t *pt_frame_array);
 
 uint8_t Calculate_Checksum(const uint8_t *pt_frame_array);
 uint8_t CheckFrame(const uint8_t *pt_frame_array);
 
-int CreateFrame(uint8_t *pt_frame, const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data);
+uint8_t CreateFrame(uint8_t *pt_frame, const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data);
+uint8_t CreateSendFrame(const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data);
 
 
 #ifdef __cplusplus

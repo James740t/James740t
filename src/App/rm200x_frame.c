@@ -15,7 +15,6 @@ const char *FRAME_TASK_TAG = "FRAME_TASK";
 // Globals
 
 //Local prototypes
-void process_Frame_task(void *arg);
 
 #define STACK_MONITOR   true
 #if STACK_MONITOR
@@ -72,7 +71,7 @@ uint8_t Calculate_Checksum(const uint8_t *pt_frame_array)
 uint8_t Get_Frame_Length (const uint8_t *pt_frame_array)
 {
     uint8_t length_in = pt_frame_array[2];
-    return length_in + 5;
+    return length_in + 4;
 }
 
 uint8_t Get_Frame_Intent (const uint8_t *pt_frame_array)
@@ -154,7 +153,7 @@ uint8_t CreateFrame(uint8_t *pt_frame, const uint8_t pt_intent, const uint8_t da
 
 uint8_t CreateSendFrame(const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data)
 {
-    static uint8_t _frame[FRAME_FRAME_LENGTH];
+    static uint8_t _frame[FRAME_BUFFER_SIZE];
     static uint8_t *frame  = (uint8_t *)&_frame;;
     memset(frame, 0x00, sizeof(_frame));
 
@@ -193,24 +192,37 @@ uint8_t CreateSendFrame(const uint8_t pt_intent, const uint8_t data_size, const 
 // RM200x FRAME BUILDING  -- END --
 /*****************************************************************************/
 
-void init_Frames(void)
+void init_rm200x_application(void)
 {
-    // Initialise things here - startup
+    // SETUP REPORTING LEVELS
+    // Frame Module
+    esp_log_level_set(FRAME_TASK_TAG, ESP_LOG_INFO);
+    // ACK Module
+    esp_log_level_set(ACK_REPLY_TASK_TAG, ESP_LOG_WARN);
+    esp_log_level_set(ACK_PROCESS_TASK_TAG, ESP_LOG_WARN);
 
-    // wait for all required tasks to come online
-    while (
-        // UART is all running
-        (xqUART_tx == NULL) || (xqUART_rx == NULL) || (xHandle_uart_tx == NULL) || (xHandle_uart_rx == NULL) || (xHandle_uart_isr == NULL))
-    {
-        // wait 100ms then check again
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
 
-    // Start the tasks running here:
-    // ACK in Process Task - ACK reply pumped out onto a queue
+    // SETUP ALL QUEUES
+    // Setup the frame Queue - to be used after ACK has been sent
+    xqFrame_Rx = xQueueCreate(FRAME_QUEUE_DEPTH, sizeof(uint8_t) * FRAME_BUFFER_SIZE);
+    // ACK receive buffer Queue
+    xqACK_Send_Reply = xQueueCreate(ACK_QUEUE_DEPTH, sizeof(uint8_t) * ACK_BUFFER_SIZE);
+    // ACK receive buffer Queue
+    xqACK_Process = xQueueCreate(ACK_QUEUE_DEPTH, sizeof(uint8_t) * ACK_BUFFER_SIZE);
+    // ACK Response output Queue
+    xqACK_Response = xQueueCreate(ACK_QUEUE_DEPTH, sizeof(ack_message_t));
+
+
+    //TASKS
+    // Frame marshalling
     xTaskCreate(process_Frame_task, FRAME_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_Frame_Rx);
-    // Wait a shor time before starting the next task - they depend on each other...
-    //vTaskDelay(250 / portTICK_PERIOD_MS);
+
+    // ACK in Process Task - ACK reply pumped out onto a queue
+    xTaskCreate(process_ACK_task, ACK_PROCESS_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_ACK_Process);
+
+    // ACK Reply Task - held with ACK Queue until data is available
+    xTaskCreate(reply_ACK_task, ACK_REPLY_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_ACK_Reply);
+
 }
 
 /******************************************************************************************/
@@ -230,53 +242,67 @@ void process_Frame_task(void *arg)
     static uint8_t *frame_in_buffer = _frame_in_buffer;
     memset(frame_in_buffer, 0x00, sizeof(_frame_in_buffer));
 
-    // Setup the frame Queue - to be used after ACK has been sent
-    xqFrame_Rx = xQueueCreate(FRAME_QUEUE_DEPTH, sizeof(uint8_t) * FRAME_FRAME_LENGTH);
+    static uint8_t _frame_out_buffer[FRAME_BUFFER_SIZE];
+    static uint8_t *frame_out_buffer = _frame_out_buffer;
+    memset(frame_out_buffer, 0x00, sizeof(_frame_out_buffer));
 
-    //Wait for Queues to be online
-    while (
-        // Make sure all Queues are running
-        (xqACK_Send_Reply == NULL) || (xqFrame_Rx == NULL) || (xqACK_Response == NULL))
-    {
-        // wait 100ms then check again
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
+    static uint8_t _frame_ack_buffer[FRAME_BUFFER_SIZE];
+    static uint8_t *frame_ack_buffer = _frame_ack_buffer;
+    memset(frame_ack_buffer, 0x00, sizeof(_frame_ack_buffer));
 
     // Task loop
     while (1)
     {
         // Clear stuff here ready for a new input message
         memset(frame_in_buffer, 0x00, sizeof(_frame_in_buffer));
+        memset(frame_out_buffer, 0x00, sizeof(_frame_out_buffer));
+        memset(frame_ack_buffer, 0x00, sizeof(_frame_ack_buffer));
 
         // Block until a message is put on the queue
         if (xQueueReceive(xqFrame_Rx, frame_in_buffer, (TickType_t)portMAX_DELAY) == pdPASS)
         {
-            // Send it to be ACK'ed
-            xQueueSend(xqACK_Send_Reply, frame_in_buffer, (TickType_t)0);
-
-            ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_WARN);
-
-            //Get incomming intent:
-            uint8_t intent = Get_Frame_Intent(frame_in_buffer);
-            // Do stuff with the data received
-            switch (intent)
+            if (CheckFrame(frame_in_buffer) == 0x00) // Frame is good
             {
+                ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_WARN);
+
+                // Copy the incomming buffer
+                memcpy(frame_ack_buffer, frame_in_buffer, sizeof(_frame_in_buffer));
+                memcpy(frame_out_buffer, frame_in_buffer, sizeof(_frame_in_buffer));
+
+                // Get incomming intent:
+                uint8_t intent = Get_Frame_Intent(frame_in_buffer);
+
+                // It is a normal incomming message so we need to ACK it
+                if (intent != CMD_ACK)
+                {
+                    // ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, frame_ack_buffer, Get_Frame_Length(frame_ack_buffer), ESP_LOG_WARN);
+                    xQueueSend(xqACK_Send_Reply, frame_ack_buffer, (TickType_t)0);
+                }
+/******************************************************************************************************************************************/
+                // Process the incomming intents i.e. do stuff with the data received
+/******************************************************************************************************************************************/
+                switch (intent)
+                {
+                case CMD_ACK:
+                {
+                    // It is an ACK Message so we need to processed it to get the ACK status
+                    xQueueSend(xqACK_Process, frame_ack_buffer, (TickType_t)0);
+                    break;
+                }
                 case CMD_AUDIO:
                 {
+                    // Volume and Mute status
                     ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_INFO);
                     break;
                 }
-
-
 
                 default:
                 {
                     // do nothing
                     break;
                 }
+                }
             }
-
-
 
 #if STACK_MONITOR
             uxHighWaterMark_RX = uxTaskGetStackHighWaterMark(NULL);

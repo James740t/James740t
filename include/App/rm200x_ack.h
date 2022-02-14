@@ -37,6 +37,7 @@ extern TaskHandle_t xHandle_ACK_Process;
 
 extern QueueHandle_t xqACK_Send_Reply;
 extern QueueHandle_t xqACK_Response;
+extern QueueHandle_t xqACK_Process;
 
 //TYPE DEFINITIONS
 typedef struct uart_message_t uart_message_t;
@@ -51,7 +52,7 @@ struct ack_message_t
 #define ACK_PORT                FRAME_PORT
 
 #define ACK_BUFFER_SIZE         FRAME_BUFFER_SIZE
-#define ACK_QUEUE_DEPTH         16
+#define ACK_QUEUE_DEPTH         FRAME_QUEUE_DEPTH
 #define ACK_FRAME_LENGTH        8
 
 //Task Tags
@@ -64,7 +65,8 @@ extern const char *ACK_PROCESS_TASK_TAG;
 uint8_t Create_ACK_Reply(uint8_t *pt_ack, const uint8_t *pt_frame_in_array, uint8_t p_ack_state);
 uint8_t Create_ACK_Reply_UART(uart_message_t *pt_ack_uart, const uint8_t *pt_frame_in_array, uint8_t p_ack_state);
 
-void init_ack(void);
+void reply_ACK_task(void *arg);
+void process_ACK_task(void *arg);
 
 #ifdef __cplusplus
 } // extern "C"

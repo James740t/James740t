@@ -50,13 +50,6 @@ void app_main() //Called from an "internal" main.c
     // FS - File System Module
     esp_log_level_set(FS_TASK_TAG, ESP_LOG_ERROR);
 
-    /***  START THE APPLICATION HERE  ***/
-    // Frame Module
-    esp_log_level_set(FRAME_TASK_TAG, ESP_LOG_INFO);
-    // ACK Module
-    esp_log_level_set(ACK_REPLY_TASK_TAG, ESP_LOG_NONE);
-    esp_log_level_set(ACK_PROCESS_TASK_TAG, ESP_LOG_NONE);
-
     //Initialise the config file system - MOUNT ONLY - this is done on each start up
     fs_initialise();
 
@@ -83,11 +76,8 @@ void app_main() //Called from an "internal" main.c
         socket_client_init();
     #endif
 
-    //APPLICATION TASKS
-    
-    init_ack();
-
-    init_Frames();
+    //APPLICATION TASKS    
+    init_rm200x_application();
 
     //fs_test();
     //fs_finalise();

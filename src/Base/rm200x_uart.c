@@ -318,19 +318,19 @@ void tx_uart_task(void *arg)
     // UART TX buffer Queue
     xqUART_tx = xQueueCreate(UART_TX_QUEUE_DEPTH, sizeof(uart_message_t));
 
-    //wait for all required tasks to come online
-    while (
-               (xqUART_tx == NULL)
-            || (xqUART_rx == NULL)
-            || (xHandle_uart_tx == NULL) 
-            || (xHandle_uart_rx == NULL) 
-            || (xHandle_uart_isr == NULL)
-            || (xHandle_blink == NULL)
-          )
-    {
-        // wait 1 second then check again
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
+    // //wait for all required tasks to come online
+    // while (
+    //            (xqUART_tx == NULL)
+    //         || (xqUART_rx == NULL)
+    //         || (xHandle_uart_tx == NULL) 
+    //         || (xHandle_uart_rx == NULL) 
+    //         || (xHandle_uart_isr == NULL)
+    //         || (xHandle_blink == NULL)
+    //       )
+    // {
+    //     // wait 1 second then check again
+    //     vTaskDelay(100 / portTICK_PERIOD_MS);
+    // }
     
     while (1) 
     {
@@ -419,18 +419,18 @@ void rx_uart_task(void *arg)
     // UART IO buffer Queues
     xqUART_rx = xQueueCreate(UART_RX_QUEUE_DEPTH, sizeof(uart_message_t));
 
-    // wait for all required tasks to come online
-    while (
-        (xqUART_tx == NULL) 
-        || (xqUART_rx == NULL) 
-        || (xHandle_uart_tx == NULL) 
-        || (xHandle_uart_rx == NULL) 
-        || (xHandle_uart_isr == NULL) 
-        || (xHandle_blink == NULL))
-    {
-        // wait 1 second then check again
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
+    // // wait for all required tasks to come online
+    // while (
+    //     (xqUART_tx == NULL) 
+    //     || (xqUART_rx == NULL) 
+    //     || (xHandle_uart_tx == NULL) 
+    //     || (xHandle_uart_rx == NULL) 
+    //     || (xHandle_uart_isr == NULL) 
+    //     || (xHandle_blink == NULL))
+    // {
+    //     // wait 1 second then check again
+    //     vTaskDelay(100 / portTICK_PERIOD_MS);
+    // }
 
     while (1)
     {
@@ -468,14 +468,14 @@ void rx_uart_task(void *arg)
             {
                 //Deal with the incomming frame
                 xQueueSend(xqFrame_Rx, &(rx_message->data), (TickType_t)0);
+                ESP_LOG_BUFFER_HEXDUMP(TX_TASK_TAG, &(rx_message->data), 8, ESP_LOG_WARN);
                 
                 // Flash LED to show activity
                 xSemaphoreGive(bin_s_sync_blink_task);
-
             }
 
             int len_str = 0;
-            if (rx_message->IsHEX)
+            if ((rx_message->IsHEX) && (!rx_message->IsFrame))
             {
                 if (HEX_DELIMITED)
                 {

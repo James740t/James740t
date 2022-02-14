@@ -383,19 +383,19 @@ void mqtt_rx_task(void *arg)
     // MQTT IO buffer Queue
     xqMQTT_rx_Messages = xQueueCreate(MQTT_Q_DEPTH, sizeof(_mqtt_rx));
 
-    //wait for all required tasks to come online
-    while (
-               (xqMQTT_tx_Messages == NULL)
-            || (xqMQTT_rx_Messages == NULL)
-            || (xHandle_uart_tx == NULL) 
-        //    || (xHandle_uart_rx == NULL) 
-            || (xHandle_uart_isr == NULL)
-            || (xHandle_blink == NULL)
-          )
-    {
-        // wait 1 second then check again
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
+    // //wait for all required tasks to come online
+    // while (
+    //            (xqMQTT_tx_Messages == NULL)
+    //         || (xqMQTT_rx_Messages == NULL)
+    //         || (xHandle_uart_tx == NULL) 
+    //     //    || (xHandle_uart_rx == NULL) 
+    //         || (xHandle_uart_isr == NULL)
+    //         || (xHandle_blink == NULL)
+    //       )
+    // {
+    //     // wait 1 second then check again
+    //     vTaskDelay(100 / portTICK_PERIOD_MS);
+    // }
 
     // Task Loop - only run if there is a good message queue
     while (1)
@@ -537,22 +537,20 @@ void mqtt_tx_task(void *arg)
     // MQTT IO buffer Queue
     xqMQTT_tx_Messages = xQueueCreate(MQTT_Q_DEPTH, sizeof(_mqtt_tx));
 
-    //wait for all required tasks to come online
-    while (
-               (xqMQTT_tx_Messages == NULL)
-            || (xqMQTT_rx_Messages == NULL)
-            || (xHandle_uart_tx == NULL) 
-        //    || (xHandle_uart_rx == NULL) 
-            || (xHandle_uart_isr == NULL)
-            || (xHandle_blink == NULL)
-            || (xqMQTT_rx_Messages == NULL)
-          )
-    {
-        // wait 1 second then check again
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-
-        ;
+    // //wait for all required tasks to come online
+    // while (
+    //            (xqMQTT_tx_Messages == NULL)
+    //         || (xqMQTT_rx_Messages == NULL)
+    //         || (xHandle_uart_tx == NULL) 
+    //     //    || (xHandle_uart_rx == NULL) 
+    //         || (xHandle_uart_isr == NULL)
+    //         || (xHandle_blink == NULL)
+    //         || (xqMQTT_rx_Messages == NULL)
+    //       )
+    // {
+    //     // wait 1 second then check again
+    //     vTaskDelay(100 / portTICK_PERIOD_MS);
+    // }
 
     char ip_addr[32];
     sprintf((char *)&ip_addr, "IP Address: " IPSTR, IP2STR(&RM_IP.ip));

@@ -35,9 +35,8 @@ extern QueueHandle_t xqFrame_Rx;
 //Definitions
 #define FRAME_PORT              UART_NUM_2
 
-#define FRAME_BUFFER_SIZE       256
+#define FRAME_BUFFER_SIZE       136
 #define FRAME_QUEUE_DEPTH       16
-#define FRAME_FRAME_LENGTH      256
 
 //Types
 //typedef struct uart_message_t uart_message_t;
@@ -87,7 +86,10 @@ uint8_t CheckFrame(const uint8_t *pt_frame_array);
 uint8_t CreateFrame(uint8_t *pt_frame, const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data);
 uint8_t CreateSendFrame(const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data);
 
-void init_Frames(void);
+void init_rm200x_application(void);
+
+//TASKS
+void process_Frame_task(void *arg);
 
 #ifdef __cplusplus
 } // extern "C"

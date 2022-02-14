@@ -46,8 +46,6 @@ UBaseType_t uxHighWaterMark_EV;
 /******************************************************************************************/
 // ACK - Definitions
 /******************************************************************************************/
-void reply_ACK_task(void *arg);
-void process_ACK_task(void *arg);
 
 /******************************************************************************************/
 // ACK - Helpers
@@ -106,29 +104,7 @@ uint8_t Create_ACK_Reply_UART(uart_message_t *pt_ack_uart, const uint8_t *pt_fra
 /******************************************************************************************/
 // ACK
 /******************************************************************************************/
-void init_ack(void) 
-{
-    // Initialise things here - startup
 
-    // wait for all required tasks to come online
-    while (
-        // UART is all running
-        (xqUART_tx == NULL) || (xqUART_rx == NULL) || (xHandle_uart_tx == NULL) || (xHandle_uart_rx == NULL) || (xHandle_uart_isr == NULL))
-    {
-        // wait 100ms then check again
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-    // Start the tasks running here:
-    // Wait a short time before starting the next task - they depend on each other...
-    vTaskDelay(250 / portTICK_PERIOD_MS);
-    // ACK in Process Task - ACK reply pumped out onto a queue
-    xTaskCreate(process_ACK_task, ACK_PROCESS_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_ACK_Process);
-    // Wait a short time before starting the next task - they depend on each other...
-    vTaskDelay(250 / portTICK_PERIOD_MS);
-    // ACK Reply Task - held with ACK Queue until data is available
-    xTaskCreate(reply_ACK_task, ACK_REPLY_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_ACK_Reply);
-    
-}
 /******************************************************************************************/
 // ACK TASK
 /******************************************************************************************/
@@ -154,18 +130,6 @@ void reply_ACK_task(void *arg)
     static uart_message_t *tx_ack = &_tx_ack;
     memset(tx_ack, 0, sizeof(_tx_ack));
 
-    // ACK receive buffer Queue
-    xqACK_Send_Reply = xQueueCreate(ACK_QUEUE_DEPTH, sizeof(_frame_in_buffer));
-
-    //Wait for Queues to be online
-    while (
-        // Make sure all Queues are running
-        (xqACK_Send_Reply == NULL) || (xqFrame_Rx == NULL) || (xqACK_Response == NULL))
-    {
-        // wait 100ms then check again
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
-
     // Task loop
     while (1)
     {
@@ -179,40 +143,30 @@ void reply_ACK_task(void *arg)
         {
             ESP_LOG_BUFFER_HEXDUMP(ACK_REPLY_TASK_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_INFO);
 
-            if (Get_Frame_Intent(frame_in_buffer) == CMD_ACK)
-            {
-                // ACK Message send to be processed
-                xQueueSend(xqACK_Process, frame_in_buffer, (TickType_t)0);
-            }
-            else
-            {
-                // Normal message so we need to send to Frame processor and send an ACK
-                xQueueSend(xqFrame_Rx, frame_in_buffer, (TickType_t)0);
-                // Check the incomming frame
-                byte error;
-                error.byte = CheckFrame(frame_in_buffer);
-                uint8_t ack_status = 0x00;
-                if (error.byte == 0x00)
-                    ack_status = ACK_SUCCESS;
-                if (error.bits.bit0)
-                    ack_status = ACK_UNKNOWN_ERROR;
-                if (error.bits.bit1)
-                    ack_status = ACK_BAD_LENGTH;
-                if (error.bits.bit2)
-                    ack_status = ACK_CRC_ERROR;
-                if (error.bits.bit3)
-                    ack_status = ACK_UNKNOWN_INTENT;
+            // Check the incomming frame
+            byte error;
+            error.byte = CheckFrame(frame_in_buffer);
+            uint8_t ack_status = 0x00;
+            if (error.byte == 0x00)
+                ack_status = ACK_SUCCESS;
+            if (error.bits.bit0)
+                ack_status = ACK_UNKNOWN_ERROR;
+            if (error.bits.bit1)
+                ack_status = ACK_BAD_LENGTH;
+            if (error.bits.bit2)
+                ack_status = ACK_CRC_ERROR;
+            if (error.bits.bit3)
+                ack_status = ACK_UNKNOWN_INTENT;
 
-                ESP_LOGI(ACK_REPLY_TASK_TAG, "ACK Status : 0x%02X", ack_status);
+            ESP_LOGI(ACK_REPLY_TASK_TAG, "ACK Status : 0x%02X", ack_status);
 
-                uint8_t err = Create_ACK_Reply_UART(tx_ack, frame_in_buffer, ack_status);
-                ESP_LOGI(ACK_REPLY_TASK_TAG, "ACK Message Error : 0x%02X", err);
-                if (!err)
-                {
-                    // Send it to the TX Queue
-                    ESP_LOG_BUFFER_HEXDUMP(ACK_REPLY_TASK_TAG, &(tx_ack->data), tx_ack->length, ESP_LOG_WARN);
-                    xQueueSend(xqUART_tx, tx_ack, (TickType_t)0);
-                }
+            uint8_t err = Create_ACK_Reply_UART(tx_ack, frame_in_buffer, ack_status);
+            ESP_LOGI(ACK_REPLY_TASK_TAG, "ACK Message Error : 0x%02X", err);
+            if (!err)
+            {
+                // Send it to the TX Queue
+                ESP_LOG_BUFFER_HEXDUMP(ACK_REPLY_TASK_TAG, &(tx_ack->data), tx_ack->length, ESP_LOG_WARN);
+                xQueueSend(xqUART_tx, tx_ack, (TickType_t)0);
             }
 
 #if STACK_MONITOR
@@ -242,20 +196,6 @@ void process_ACK_task(void *arg)
     static ack_message_t _rx_ack;
     static ack_message_t *rx_ack = &_rx_ack;
     memset(rx_ack, 0, sizeof(_rx_ack));
-
-    // ACK receive buffer Queue
-    xqACK_Process = xQueueCreate(ACK_QUEUE_DEPTH, sizeof(_frame_in_buffer));
-    // ACK Response output Queue
-    xqACK_Response = xQueueCreate(ACK_QUEUE_DEPTH, sizeof(_rx_ack));
-
-    //Wait for Queues to be online
-    while (
-        // Make sure all Queues are running
-        (xqACK_Send_Reply == NULL) || (xqFrame_Rx == NULL) || (xqACK_Response == NULL))
-    {
-        // wait 100ms then check again
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-    }
 
     // Task loop
     while (1)

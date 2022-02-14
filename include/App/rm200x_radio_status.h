@@ -18,6 +18,9 @@
 //ESP Headers
 #include "esp_log.h"
 
+//JSON Header
+#include "JSON/json-maker.h"
+
 //Base Headers
 #include "Base/rm200x_mqtt.h"
 
@@ -53,6 +56,7 @@ extern const char *RADIO_COMMAND_TASK_TAG;
 #define STATUS_BUFFER_SIZE      FRAME_BUFFER_SIZE
 #define STATUS_QUEUE_DEPTH      4
 
+#define JSON_STRING_LENGTH      512
 
 //Enumerations
 

@@ -16,7 +16,9 @@
 			"sstream": "c",
 			"freertosconfig.h": "c",
 			"rm200x_gpio.h": "c",
-			"rm200x_uart.h": "c"
+			"rm200x_uart.h": "c",
+			"jsmn.h": "c",
+			"cjson.h": "c"
 		}
 	}
 }

@@ -75,7 +75,7 @@ void mqtt_send_json(const char *mqtt_text)
     // Flash LED to show activity
     xSemaphoreGive(bin_s_sync_blink_task);
 
-    ESP_LOGI(AUDIO_TASK_TAG, "Message: %s/%s - data bytes = %d\r\n", mqtt_msg->topic, mqtt_msg->data, mqtt_msg->data_len);
+    ESP_LOGI(AUDIO_TASK_TAG, "Message: %s/%s - data bytes = %d", mqtt_msg->topic, mqtt_msg->data, mqtt_msg->data_len);
 }
 
 /******************************************************************************************/

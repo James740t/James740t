@@ -25,6 +25,8 @@
 #include "Base/rm200x_mqtt.h"
 
 //Application Headers
+#include "rm200x_frame_definitions.h"
+#include "rm200x_protocol.h"
 #include "rm200x_frame.h"
 #include "rm200x_ack.h"
 
@@ -54,9 +56,9 @@ extern const char *RADIO_COMMAND_TASK_TAG;
 #define STATUS_PORT             FRAME_PORT
 
 #define STATUS_BUFFER_SIZE      FRAME_BUFFER_SIZE
-#define STATUS_QUEUE_DEPTH      4
+#define STATUS_QUEUE_DEPTH      8
 
-#define JSON_STRING_LENGTH      512
+
 
 //Enumerations
 
@@ -65,29 +67,7 @@ extern const char *RADIO_COMMAND_TASK_TAG;
 
 // TASKS
 void audio_IN_task(void *arg);
-
-
-
-
-/*****************************************************************************/
-/*   PARAMETERS                                                              */
-/*****************************************************************************/
-// CMD_0x10
-extern uint8_t VolumeLevel; //Decode 0 - 50 == range between 0 - 50 (decimal)
-extern bool Mute;           //Decode with ON_OFF enum
-// CMD_0x11
-extern int8_t Bass;         //Decode +/- 10 == range between 0 - 20 (decimal)
-extern int8_t Middle;       //Decode +/- 10 == range between 0 - 20 (decimal)
-extern int8_t Treble;       //Decode +/- 10 == range between 0 - 20 (decimal)
-extern int8_t Fader;        //Decode +/- 10 == range between 0 - 20 (decimal)
-extern int8_t Balance;      //Decode +/- 10 == range between 0 - 20 (decimal)
-extern bool Loudness;       //Decode with ON_OFF enum
-extern bool SoftMute;       //Decode with ON_OFF enum
-extern uint8_t EQMode;      //Enumerated
-// CMD_0x21
-extern bool IGN;            //1==ON, 0==OFF
-extern bool Power;          //1==ON, 0==OFF
-extern bool Sleep;          //1==ON, 0==OFF
+void audio_OUT_task(void *arg);
 
 
 #ifdef __cplusplus

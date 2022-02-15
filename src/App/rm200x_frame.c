@@ -6,12 +6,16 @@
 
 //FREERTOS CONTROL ITEMS
 TaskHandle_t xHandle_Frame_Rx = NULL;
+TaskHandle_t xHandle_Frame_Tx = NULL;
 
 QueueHandle_t xqFrame_Rx = NULL;
+QueueHandle_t xqFrame_Tx = NULL;
 QueueHandle_t xqFrame_Process = NULL;
 
+
 //Task Tags
-const char *FRAME_TASK_TAG = "FRAME_TASK";
+const char *FRAME_RX_TAG = "FRAME_RX";
+const char *FRAME_TX_TAG = "FRAME_TX";
 
 // Globals
 
@@ -118,8 +122,8 @@ uint8_t CheckFrame(const uint8_t *pt_frame_array)
     uint8_t crc_in = pt_frame_array[crc_idx];
     uint8_t crc_calc = Calculate_Checksum(pt_frame_array);
 
-    //ESP_LOGI(FRAME_TASK_TAG, "Pay. Len: 0x%02X, Msg. Len:: 0x%02X", length_in, crc_idx + 1);
-    //ESP_LOGI(FRAME_TASK_TAG, "CRC in: 0x%02X, CRC calc: 0x%02X", crc_in, crc_calc);
+    //ESP_LOGI(FRAME_RX_TAG, "Pay. Len: 0x%02X, Msg. Len:: 0x%02X", length_in, crc_idx + 1);
+    //ESP_LOGI(FRAME_RX_TAG, "CRC in: 0x%02X, CRC calc: 0x%02X", crc_in, crc_calc);
 
     if (crc_in != crc_calc) error.bits.bit2 = 1;
 
@@ -146,7 +150,7 @@ uint8_t CreateFrame(uint8_t *pt_frame, const uint8_t pt_intent, const uint8_t da
     byte check;
     check.byte = CheckFrame(pt_frame);
 
-    ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, pt_frame, index, ESP_LOG_INFO);
+    ESP_LOG_BUFFER_HEXDUMP(FRAME_RX_TAG, pt_frame, index, ESP_LOG_INFO);
 
     return check.byte;
    //Build OK returns the whole frame length else returns -1 == NOK 
@@ -158,35 +162,48 @@ uint8_t CreateSendFrame(const uint8_t pt_intent, const uint8_t data_size, const 
     static uint8_t *frame  = (uint8_t *)&_frame;;
     memset(frame, 0x00, sizeof(_frame));
 
-    static uart_message_t _frm_message;
-    static uart_message_t *frm_message = &_frm_message;
-    memset(frm_message, 0x00, sizeof(_frm_message));
+    uint8_t err = CreateFrame(frame, pt_intent, data_size, pt_data);
 
-    uint8_t test = CreateFrame(frame, pt_intent, data_size, pt_data);
-
-    if (test == ACK_SUCCESS)
+    if (!err)
     {
-        // Build a UART message to queue
-        frm_message->IsFrame = true;
-        frm_message->IsASCII = false;
-        frm_message->IsHEX = true;
-        frm_message->port = FRAME_PORT;
-        frm_message->length = (uint16_t)Get_Frame_Length(frame);
-        frm_message->Message_ID = (int)Get_Rolling_Counter(frame);
-        memcpy(&(frm_message->data), frame, frm_message->length);
-
-        // Check the frame
-        byte check;
-        check.byte = CheckFrame(frame);
-
-        if (check.byte == 0)
-        {
-            // Send it to the UART TX Queue
-            ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, &(frm_message->data), frm_message->length, ESP_LOG_WARN);
-            xQueueSend(xqUART_tx, frm_message, (TickType_t)0);
-        }
+        // Send the Frame out onto the UART
+        err = SendFrame(frame, FRAME_PORT);
     }
-    return test;
+    return err;
+}
+
+/*****************************************************************************/
+// RM200x FRAME SENDER
+/*****************************************************************************/
+
+uint8_t SendFrame(uint8_t *p_frame_array, uint8_t p_port)
+{
+    static uart_message_t _tx_uart;
+    static uart_message_t *tx_uart = &_tx_uart;
+    memset(tx_uart, 0, sizeof(uart_message_t));
+
+    // Build a UART message to queue
+    tx_uart->IsFrame = true;
+    tx_uart->IsASCII = false;
+    tx_uart->IsHEX = true;
+    tx_uart->port = p_port;
+    tx_uart->length = Get_Frame_Length(p_frame_array);
+    tx_uart->Message_ID = *(p_frame_array + 3);
+    memcpy(&(tx_uart->data), p_frame_array, tx_uart->length);
+
+    // Check the frame
+    byte check;
+    check.byte = CheckFrame((const uint8_t *)&(tx_uart->data));
+
+    ESP_LOGI(FRAME_TX_TAG, "Frame TX Error : 0x%02X", check.byte);
+    if (!check.byte)
+    {
+        // Send it to the TX Queue
+        ESP_LOG_BUFFER_HEXDUMP(FRAME_TX_TAG, &(tx_uart->data), tx_uart->length, ESP_LOG_WARN);
+        xQueueSend(xqUART_tx, tx_uart, (TickType_t)0);
+    }
+
+    return check.byte;
 }
 
 /*****************************************************************************/
@@ -197,7 +214,8 @@ void init_rm200x_application(void)
 {
     // SETUP REPORTING LEVELS
     // Frame Module
-    esp_log_level_set(FRAME_TASK_TAG, ESP_LOG_NONE);
+    esp_log_level_set(FRAME_RX_TAG, ESP_LOG_NONE);
+    esp_log_level_set(FRAME_TX_TAG, ESP_LOG_INFO);
     // ACK Module
     esp_log_level_set(ACK_REPLY_TASK_TAG, ESP_LOG_NONE);
     esp_log_level_set(ACK_PROCESS_TASK_TAG, ESP_LOG_NONE);
@@ -205,8 +223,10 @@ void init_rm200x_application(void)
     esp_log_level_set(AUDIO_TASK_TAG, ESP_LOG_INFO);
 
     // SETUP ALL QUEUES
-    // Setup the frame Queue - to be used after ACK has been sent
+    // Setup the frame Rx Queue
     xqFrame_Rx = xQueueCreate(FRAME_QUEUE_DEPTH, sizeof(uint8_t) * FRAME_BUFFER_SIZE);
+    // Setup the frame Tx Queue - Used from external sources e.g. MQTT
+    xqFrame_Tx = xQueueCreate(FRAME_TX_QUEUE_DEPTH, sizeof(uint8_t) * FRAME_TX_BUFFER);
     // Frame processing queue - long
     xqFrame_Process = xQueueCreate(FRAME_PROCESSOR_DEPTH, sizeof(uint8_t) * FRAME_BUFFER_SIZE);
     // ACK receive buffer Queue
@@ -217,10 +237,14 @@ void init_rm200x_application(void)
     xqACK_Response = xQueueCreate(ACK_QUEUE_DEPTH, sizeof(ack_message_t));
 
 
-    //TASKS
+    //SETUP AND START ALL TASKS
     // Frame marshalling
-    xTaskCreate(process_Frame_task, FRAME_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES - 10, &xHandle_Frame_Rx);
+    xTaskCreate(process_Frame_task, FRAME_RX_TAG, 1024*3, NULL, configMAX_PRIORITIES - 10, &xHandle_Frame_Rx);
     configASSERT(xHandle_Frame_Rx);
+
+    // Frame Out Task - Process all frame transmissions
+    xTaskCreate(transmit_Frame_task, FRAME_TX_TAG, 1024*3, NULL, configMAX_PRIORITIES - 11, &xHandle_Frame_Tx);
+    configASSERT(xHandle_Frame_Tx);
 
     // ACK in Process Task - ACK reply pumped out onto a queue
     xTaskCreate(process_ACK_task, ACK_PROCESS_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES - 8, &xHandle_ACK_Process);
@@ -234,7 +258,6 @@ void init_rm200x_application(void)
     xTaskCreate(audio_IN_task, AUDIO_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES - 7, &xHandle_Audio_in_task);
     configASSERT(xHandle_Audio_in_task);
 
-    
 }
 
 /******************************************************************************************/
@@ -273,7 +296,7 @@ void process_Frame_task(void *arg)
         // Block until a message is put on the queue
         if (xQueueReceive(xqFrame_Rx, frame_in_buffer, (TickType_t)portMAX_DELAY) == pdPASS)
         {
-            ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_WARN);
+            ESP_LOG_BUFFER_HEXDUMP(FRAME_RX_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_WARN);
 
             // Copy the incomming buffer
             memcpy(frame_ack_buffer, frame_in_buffer, sizeof(_frame_in_buffer));
@@ -285,7 +308,7 @@ void process_Frame_task(void *arg)
             // It is a normal incomming message so we need to ACK it
             if (intent != CMD_ACK)
             {
-                // ESP_LOG_BUFFER_HEXDUMP(FRAME_TASK_TAG, frame_ack_buffer, Get_Frame_Length(frame_ack_buffer), ESP_LOG_WARN);
+                // ESP_LOG_BUFFER_HEXDUMP(FRAME_RX_TAG, frame_ack_buffer, Get_Frame_Length(frame_ack_buffer), ESP_LOG_WARN);
                 xQueueSend(xqACK_Send_Reply, frame_ack_buffer, (TickType_t)0);
             }
 
@@ -329,6 +352,98 @@ void process_Frame_task(void *arg)
 
     free(xqFrame_Rx);
     vTaskDelete(xHandle_Frame_Rx);
+}
+
+/******************************************************************************************/
+// FRAME RX TASK
+/******************************************************************************************/
+
+void transmit_Frame_task(void *arg)
+{
+#if STACK_MONITOR
+    /* Inspect our own high water mark on entering the task. */
+    uxHighWaterMark_TX = uxTaskGetStackHighWaterMark(NULL);
+    printf("FRAME PROCESS STACK HW (START) = %d\r\n", uxHighWaterMark_TX);
+#endif
+
+    // Initialise things here
+    uint8_t err = 0;
+    int _len = 0;
+
+    static uint8_t _incomming[FRAME_TX_BUFFER];
+    static uint8_t *incomming = _incomming;
+    memset(incomming, 0x00, sizeof(_incomming));
+
+    static uint8_t _frame[FRAME_TX_BUFFER];
+    static uint8_t *frame = _frame;
+    memset(frame, 0x00, sizeof(_frame));
+
+    while (1)
+    {
+        // Clear stuff here ready for a new input message
+        memset(incomming, 0x00, sizeof(_incomming));
+
+        // Block until a message is put on the queue
+        if (xQueueReceive(xqFrame_Tx, incomming, (TickType_t)portMAX_DELAY) == pdPASS)
+        {
+            // Data can be anything - likely to be JSON or Frame (assume string for diag.)
+            ESP_LOG_BUFFER_HEXDUMP(FRAME_TX_TAG, incomming, strlen((char *)incomming), ESP_LOG_INFO);
+            //Check if frame [0] == FF and [1] == 55
+            if ((incomming[0] == 0xFF) && (incomming[1] == 0x55))
+            {
+                // treat it like a frame
+                err = SendFrame(incomming, FRAME_PORT);
+                if (err)
+                {
+                    ESP_LOG_BUFFER_HEXDUMP(FRAME_TX_TAG, incomming, strlen((char *)incomming), ESP_LOG_ERROR);
+                }
+            }
+            else
+            {
+                // Treat it like a string representation of a frame
+
+                // Is it a string representation of a hex frame
+                if (
+                    (incomming[0] == 0x46) 
+                    && (incomming[1] == 0x46) 
+                    && (incomming[2] == 0x20) 
+                    && (incomming[3] == 0x35) 
+                    && (incomming[4] == 0x35)
+                    )
+                {
+                    //Clean frame buffer
+                    memset(frame, 0x00, sizeof(_frame));
+                    //Parse message and convert it to binary (hex) format
+                    Hex2Bytes((char *)incomming, (char *)frame, &_len);
+                    //Send it out as a frame
+                    err = SendFrame(frame, FRAME_PORT);
+                    if (err)
+                    {
+                        ESP_LOG_BUFFER_HEXDUMP(FRAME_TX_TAG, frame, _len, ESP_LOG_ERROR);
+                    }
+                }
+                // Is it a JSON special request that needs translation and further - it will start with " or {
+                if (
+                       (incomming[0] == 0x22) 
+                    || (incomming[1] == 0x7B) 
+                    )
+                {
+                    // Extract the intent structure and the process it.
+
+                }
+            }
+
+        }
+
+
+#if STACK_MONITOR
+        uxHighWaterMark_TX = uxTaskGetStackHighWaterMark(NULL);
+        printf("FRAME PROCESS STACK HW (RUN): %d\r\n", uxHighWaterMark_TX);
+#endif
+    }
+
+    free(xqFrame_Tx);
+    vTaskDelete(xHandle_Frame_Tx);
 }
 
 /******************************************************************************************/

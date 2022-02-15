@@ -411,32 +411,37 @@ void mqtt_rx_task(void *arg)
                 continue;
             }
             /**************************************************************************************************/
-            /*  DO SOMETHING WITH THE RECEIVED FRAME HEX MESSAGE                                               */
+            /*  DO SOMETHING WITH THE RECEIVED FRAME HEX MESSAGE                                              */
             /**************************************************************************************************/
             if (strcmp((char *)&mqtt_rx->topic_detail.prefix, MQTT_HEX_FRAME_PREFIX) == 0)
             {
                 ESP_LOGI(MQTT_RX_TASK_TAG, "COMM PORT TX - FRAME");
-                // Send a copy of the MQTT message out on the UART
-                static uart_message_t uart_tx_msg;
-                memset(&uart_tx_msg, 0, sizeof(uart_message_t));
+                ESP_LOG_BUFFER_HEXDUMP(MQTT_RX_TASK_TAG, &mqtt_rx->data, strlen(mqtt_rx->data), ESP_LOG_WARN);
+                // Send MQTT message to frame Tx
+                xQueueSend(xqFrame_Tx, &mqtt_rx->data, (TickType_t)0);
 
-                uart_tx_msg.Message_ID = mqtt_rx->msg_id;
-                uart_tx_msg.port = EX_UART_NUM;
-                uart_tx_msg.IsHEX = true;           // TREAT DATA AS HEX
-                uart_tx_msg.IsASCII = true;         // It IS an ASCII representation of HEX
-                uart_tx_msg.IsFrame = true;
-                int len = strlen(mqtt_rx->data);
-                if (len > UART_BUFFER_SIZE)
-                {
-                    uart_tx_msg.length = UART_BUFFER_SIZE; //(int)sizeof(uart_tx_msg.data);
-                }
-                else
-                {
-                    uart_tx_msg.length = len;
-                }
-                memcpy(&uart_tx_msg.data, mqtt_rx->data, uart_tx_msg.length); // Only copy what will fit...
-                // Place our data on the UART tx queue
-                xQueueSend(xqUART_tx, &uart_tx_msg, (TickType_t)0);
+                // // Send a copy of the MQTT message out on the UART
+
+                // static uart_message_t uart_tx_msg;
+                // memset(&uart_tx_msg, 0, sizeof(uart_message_t));
+
+                // uart_tx_msg.Message_ID = mqtt_rx->msg_id;
+                // uart_tx_msg.port = EX_UART_NUM;
+                // uart_tx_msg.IsHEX = true;           // TREAT DATA AS HEX
+                // uart_tx_msg.IsASCII = true;         // It IS an ASCII representation of HEX
+                // uart_tx_msg.IsFrame = true;
+                // int len = strlen(mqtt_rx->data);
+                // if (len > UART_BUFFER_SIZE)
+                // {
+                //     uart_tx_msg.length = UART_BUFFER_SIZE; //(int)sizeof(uart_tx_msg.data);
+                // }
+                // else
+                // {
+                //     uart_tx_msg.length = len;
+                // }
+                // memcpy(&uart_tx_msg.data, mqtt_rx->data, uart_tx_msg.length); // Only copy what will fit...
+                // // Place our data on the UART tx queue
+                // xQueueSend(xqUART_tx, &uart_tx_msg, (TickType_t)0);
                 continue;
             }
             /**************************************************************************************************/

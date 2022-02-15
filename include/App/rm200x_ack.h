@@ -63,7 +63,7 @@ extern const char *ACK_PROCESS_TASK_TAG;
 
 // Public Prototypes
 uint8_t Create_ACK_Reply(uint8_t *pt_ack, const uint8_t *pt_frame_in_array, uint8_t p_ack_state);
-uint8_t Create_ACK_Reply_UART(uart_message_t *pt_ack_uart, const uint8_t *pt_frame_in_array, uint8_t p_ack_state);
+uint8_t Create_ACK_Reply_UART(const uint8_t *pt_frame_in_array, uint8_t p_ack_state);
 
 void reply_ACK_task(void *arg);
 void process_ACK_task(void *arg);

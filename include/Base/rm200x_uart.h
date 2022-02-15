@@ -62,9 +62,9 @@ extern const char *UART_ISR_TASK_TAG;
 #define EX_UART_NUM                     UART_NUM_2
 #define UART_BUFFER_SIZE                    1024
 #define UART_RX_READ_TIMEOUT_MS             3
-#define UART_RX_QUEUE_DEPTH                 32
-#define UART_TX_QUEUE_DEPTH                 32
-#define UART_EVENT_QUEUE_DEPTH              32
+#define UART_RX_QUEUE_DEPTH                 16
+#define UART_TX_QUEUE_DEPTH                 16
+#define UART_EVENT_QUEUE_DEPTH              16
 #define UART_FIXED_MIN_TX_DELAY_MS          5
 extern uint16_t UART_VARIABLE_TX_DELAY;
 

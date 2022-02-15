@@ -3,7 +3,9 @@
 #ifndef __RM200X_FRAME_DEFINITIONS_H__
 #define __RM200X_FRAME_DEFINITIONS_H__
 
-
+/******************************************************************************************/
+// INTENT DEFINES
+/******************************************************************************************/
 //----- Intent name                intent/hex   Index(dec)
 #define CMD_ACK                      (0x02U) // 00
 #define CMD_AUDIO                    (0x10U) // 01
@@ -43,7 +45,11 @@
 #define CMD_LIST_INVALIDATION_0x59   (0x59U) // 35
 #define CMD_TEXT_0x5A                (0x5AU) // 36
 
+/******************************************************************************************/
+// ENUMERATIONS AND LIST DEFINES
+/******************************************************************************************/
 
+//----------------- ACKnowledge reception of UART message CMD_REPLY_ACK 24 0x02
 #define ACK_SUCCESS                 0x00     // Success
 #define ACK_UNKNOWN_INTENT          0x01     // Error: Unknown Intent
 #define ACK_BAD_LENGTH              0x02     // Error: Inconsistent message length
@@ -58,6 +64,59 @@
 #define ACK_SAVE_DAB_PRESET_FAILED  0x0B     // DAB stations save Preset Failed
 #define ACK_UNKNOWN_ERROR           0xFF
 
+/******************************************************************************************/
+// TYPE DEFINITIONS
+/******************************************************************************************/
+//---------------------------------- Power State Intent CMD_POWER_STATE 18 0x21
+typedef union aupPowerState{
+    uint8_t entire8bit;
+    struct {
+        uint8_t accOn    : 1;
+        uint8_t powerOn  : 1;
+        uint8_t sleep    : 1; // 0 == no sleep request, 1 == sleep request
+        uint8_t z        : 5; //----------------- patch unused bits [3..7]
+    } __attribute__((packed));
+} __attribute__((packed))
+aupPowerState_t;
+
+//--------------------------------- Radio Audio Status Intent CMD_AUDIO 01 0x10
+typedef union aupAudio {
+    uint8_t entire8bitValue;
+    struct {
+        uint8_t volume : 7;
+        uint8_t mute   : 1;
+    } __attribute__((packed));
+} __attribute__((packed))
+aupAudio_t;
+
+//--------------------------------------------- Equaliser Intent CMD_EQ 02 0x11
+#define MAX_LEVEL         (14U)   //displayed as +/-7 on Radio
+#define MAX_LEVEL_BAL_FAD (20U)   //displays as +/-10 on Radio
+    
+enum{   ENUM_EQ_MODE_OFF     = 0,
+        ENUM_EQ_MODE_POP     = 1,
+        ENUM_EQ_MODE_USER    = 2,
+        ENUM_EQ_MODE_TECHNO  = 3,
+        ENUM_EQ_MODE_ROCK    = 4,
+        ENUM_EQ_MODE_CLASSIC = 5,
+        ENUM_EQ_MODE_JAZZ    = 6,
+        ENUM_EQ_MODE_VOCAL   = 7,
+        ENUM_EQ_MODE_END
+};
+typedef union aupEQ {
+    uint64_t full48bitValue : 48;
+    struct {
+        uint8_t fade;
+        uint8_t balance;
+        uint8_t bass;
+        uint8_t middle;
+        uint8_t treble;
+        uint8_t eq_mode   : 6; // value range [0..7] need 3 bits + patch 3 bits
+        uint8_t soft_mute : 1; //------------------------------ bit 6
+        uint8_t loudness  : 1; //------------------------------ bit 7
+    } __attribute__((packed));
+} __attribute__((packed))
+aupEQ_t;
 
 
 

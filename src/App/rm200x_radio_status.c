@@ -43,28 +43,10 @@ UBaseType_t uxHighWaterMark_EV;
 /******************************************************************************************/
 //   PARAMETERS 
 /******************************************************************************************/
-// CMD_0X10
-uint8_t VolumeLevel = 0;
-bool Mute = false;
-// CMD_0x11
-int8_t Bass = 0;        //Decode +/- 10 == range between 0 - 20 (decimal)
-int8_t Middle = 0;      //Decode +/- 10 == range between 0 - 20 (decimal)
-int8_t Treble = 0;      //Decode +/- 10 == range between 0 - 20 (decimal)
-int8_t Fader = 0;       //Decode +/- 10 == range between 0 - 20 (decimal)
-int8_t Balance = 0;     //Decode +/- 10 == range between 0 - 20 (decimal)
-bool Loudness = true;   //Decode with ON_OFF enum
-bool SoftMute = false;  //Decode with ON_OFF enum
-uint8_t EQMode = 0;
-// CMD_0x21
-bool IGN;               //1==ON, 0==OFF
-bool Power;             //1==ON, 0==OFF
-bool Sleep;
-
 
 /******************************************************************************************/
 // Definitions
 /******************************************************************************************/
-
 
 /******************************************************************************************/
 // STATUS - Helpers
@@ -96,71 +78,6 @@ void mqtt_send_json(const char *mqtt_text)
     ESP_LOGI(AUDIO_TASK_TAG, "Message: %s/%s - data bytes = %d\r\n", mqtt_msg->topic, mqtt_msg->data, mqtt_msg->data_len);
 }
 
-char* volume_json(char *pt_str_json, uint8_t *incomming)
-{
-    uint8_t data_0x10 = incomming[5];
-    VolumeLevel = data_0x10 & 0b01111111;
-    Mute = (bool)(data_0x10 & 0b10000000);
-    ESP_LOGI(AUDIO_TASK_TAG, "Volume: %d, Mute: %s", VolumeLevel, Mute ? "true" : "false");
-
-    //JSON and get ready for MQTT
-    size_t length = JSON_STRING_LENGTH;
-    pt_str_json = json_objOpen(pt_str_json, "Audio", &length);          // --> {\0
-    pt_str_json = json_int(pt_str_json, "Volume", VolumeLevel, &length);   // --> {"Volume":22\0
-    pt_str_json = json_bool(pt_str_json, "Mute", Mute, &length);      // --> {"Volume":22,"Mute":0\0
-    pt_str_json = json_objClose(pt_str_json, &length);                  // --> {"Volume":22,"Mute":0}\0
-    pt_str_json = json_end(pt_str_json, &length);
-
-    return pt_str_json;
-}
-
-char* eq_json(char *pt_str_json, uint8_t *incomming)
-{
-    Bass = incomming[7] - 10;
-    Middle = incomming[8] - 10;
-    Treble = incomming[9] - 10;
-    Fader = incomming[5] - 10;
-    Balance = incomming[6] - 10;
-    EQMode = (incomming[10] & 0b00111111);
-    Loudness = (bool)(incomming[10] & 0b10000000);
-    SoftMute = (bool)(incomming[10] & 0b01000000);
-    ESP_LOGI(AUDIO_TASK_TAG, "Bass: %d, Mid: %d, Treble: %d, Loudness: %s", Bass, Middle, Treble, Loudness ? "true" : "false");
-    ESP_LOGI(AUDIO_TASK_TAG, "Fader: %d, Balance: %d, SoftMute: %s", Fader, Balance, SoftMute ? "true" : "false");
-
-    size_t length = JSON_STRING_LENGTH;
-    pt_str_json = json_objOpen(pt_str_json, "EQ", &length);
-    pt_str_json = json_int(pt_str_json, "Bass", Bass, &length); 
-    pt_str_json = json_int(pt_str_json, "Mid", Middle, &length); 
-    pt_str_json = json_int(pt_str_json, "Treble", Treble, &length); 
-    pt_str_json = json_int(pt_str_json, "Fader", Fader, &length); 
-    pt_str_json = json_int(pt_str_json, "Balance", Balance, &length); 
-    pt_str_json = json_int(pt_str_json, "EQ Mode", EQMode, &length); 
-    pt_str_json = json_bool(pt_str_json, "Loudness", Loudness, &length); 
-    pt_str_json = json_bool(pt_str_json, "SoftMute", SoftMute, &length); 
-    pt_str_json = json_objClose(pt_str_json, &length); 
-    pt_str_json = json_end(pt_str_json, &length);
-
-    return pt_str_json;
-}
-
-char* power_json(char *pt_str_json, uint8_t *incomming)
-{
-    IGN = (bool)(incomming[5] & 0b00000001);
-    Power = (bool)(incomming[5] & 0b00000010);
-    Sleep = (bool)(incomming[5] & 0b00000100);
-    ESP_LOGI(AUDIO_TASK_TAG, "Pwr: %s, Ign: %s, Sleep: %s", Power ? "true" : "false", IGN ? "true" : "false", Sleep ? "true" : "false");
-
-    //JSON and get ready for MQTT
-    size_t length = JSON_STRING_LENGTH;
-    pt_str_json = json_objOpen(pt_str_json, "Power", &length);
-    pt_str_json = json_bool(pt_str_json, "Power", Power, &length); 
-    pt_str_json = json_bool(pt_str_json, "Ignition", IGN, &length); 
-    pt_str_json = json_bool(pt_str_json, "Sleep", Sleep, &length); 
-    pt_str_json = json_objClose(pt_str_json, &length);
-    pt_str_json = json_end(pt_str_json, &length); 
-
-    return pt_str_json;
-}
 /******************************************************************************************/
 // STATUS
 /******************************************************************************************/
@@ -204,21 +121,21 @@ void audio_IN_task(void *arg)
                 case CMD_AUDIO:
                 {
                     // Process and send out to IoT via MQTT
-                    volume_json(json_buffer, frame_in_buffer);
+                    intent_0x10_json(json_buffer, frame_in_buffer);
                     mqtt_send_json(json_buffer);
                     break;
                 }
                 case CMD_EQ:
                 {
                     // Process and send out to IoT via MQTT
-                    eq_json(json_buffer, frame_in_buffer);
+                    intent_0x11_json(json_buffer, frame_in_buffer);
                     mqtt_send_json(json_buffer);
                     break;
                 }
                 case CMD_POWER_STATE:
                 {
                     // Process and send out to IoT via MQTT
-                    power_json(json_buffer, frame_in_buffer);
+                    intent_0x21_json(json_buffer, frame_in_buffer);
                     mqtt_send_json(json_buffer);
                     break;
                 }

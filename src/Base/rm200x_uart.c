@@ -317,20 +317,6 @@ void tx_uart_task(void *arg)
 
     // UART TX buffer Queue
     xqUART_tx = xQueueCreate(UART_TX_QUEUE_DEPTH, sizeof(uart_message_t));
-
-    // //wait for all required tasks to come online
-    // while (
-    //            (xqUART_tx == NULL)
-    //         || (xqUART_rx == NULL)
-    //         || (xHandle_uart_tx == NULL) 
-    //         || (xHandle_uart_rx == NULL) 
-    //         || (xHandle_uart_isr == NULL)
-    //         || (xHandle_blink == NULL)
-    //       )
-    // {
-    //     // wait 1 second then check again
-    //     vTaskDelay(100 / portTICK_PERIOD_MS);
-    // }
     
     while (1) 
     {

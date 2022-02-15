@@ -69,12 +69,15 @@ uint8_t Create_ACK_Reply(uint8_t *pt_ack, const uint8_t *pt_frame_in_array, uint
     return check.byte;
 }
 
-uint8_t Create_ACK_Reply_UART(uart_message_t *pt_ack_uart, const uint8_t *pt_frame_in_array, uint8_t p_ack_state)
+uint8_t Create_ACK_Reply_UART(const uint8_t *pt_frame_in_array, uint8_t p_ack_state)
 {
     static uint8_t _ack[ACK_FRAME_LENGTH];
     static uint8_t *pt_ack = _ack;
-
     memset(pt_ack, 0x00, sizeof(_ack));
+
+    static uart_message_t _tx_ack;
+    static uart_message_t *tx_ack = &_tx_ack;
+    memset(tx_ack, 0, sizeof(_tx_ack));
 
     uint8_t index = 0;
     pt_ack[index++] = 0xFF;                         // Frame start
@@ -87,17 +90,26 @@ uint8_t Create_ACK_Reply_UART(uart_message_t *pt_ack_uart, const uint8_t *pt_fra
     pt_ack[index] = Calculate_Checksum(pt_ack);     // CRC
 
     // Build a UART message to queue
-    pt_ack_uart->IsFrame = true;
-    pt_ack_uart->IsASCII = false;
-    pt_ack_uart->IsHEX = true;
-    pt_ack_uart->port = ACK_PORT;
-    pt_ack_uart->length = ACK_FRAME_LENGTH;
-    pt_ack_uart->Message_ID = *(pt_frame_in_array + 3);
-    memcpy(&(pt_ack_uart->data), pt_ack, ACK_FRAME_LENGTH);
+    tx_ack->IsFrame = true;
+    tx_ack->IsASCII = false;
+    tx_ack->IsHEX = true;
+    tx_ack->port = ACK_PORT;
+    tx_ack->length = ACK_FRAME_LENGTH;
+    tx_ack->Message_ID = *(pt_frame_in_array + 3);
+    memcpy(&(tx_ack->data), pt_ack, ACK_FRAME_LENGTH);
 
     // Check the frame
     byte check;
     check.byte = CheckFrame(pt_ack);
+
+    ESP_LOGI(ACK_REPLY_TASK_TAG, "ACK Message Error : 0x%02X", check.byte);
+    if (!check.byte)
+    {
+        // Send it to the TX Queue
+        ESP_LOG_BUFFER_HEXDUMP(ACK_REPLY_TASK_TAG, &(tx_ack->data), tx_ack->length, ESP_LOG_WARN);
+        xQueueSend(xqUART_tx, tx_ack, (TickType_t)0);
+    }
+
     return check.byte;
 }
 
@@ -126,18 +138,13 @@ void reply_ACK_task(void *arg)
     static uint8_t *ack_out_frame = _ack_out_frame;
     memset(ack_out_frame, 0x00, sizeof(_ack_out_frame));
 
-    static uart_message_t _tx_ack;
-    static uart_message_t *tx_ack = &_tx_ack;
-    memset(tx_ack, 0, sizeof(_tx_ack));
-
     // Task loop
     while (1)
     {
         // Clear stuff here ready for a new input message
         memset(frame_in_buffer, 0x00, sizeof(_frame_in_buffer));
         memset(ack_out_frame, 0x00, sizeof(_ack_out_frame));
-        memset(tx_ack, 0, sizeof(_tx_ack));
-
+        
         // Block until a message is put on the queue
         if (xQueueReceive(xqACK_Send_Reply, frame_in_buffer, (TickType_t)portMAX_DELAY) == pdPASS)
         {
@@ -160,14 +167,13 @@ void reply_ACK_task(void *arg)
 
             ESP_LOGI(ACK_REPLY_TASK_TAG, "ACK Status : 0x%02X", ack_status);
 
-            uint8_t err = Create_ACK_Reply_UART(tx_ack, frame_in_buffer, ack_status);
-            ESP_LOGI(ACK_REPLY_TASK_TAG, "ACK Message Error : 0x%02X", err);
-            if (!err)
+            uint8_t err = Create_ACK_Reply_UART(frame_in_buffer, ack_status);
+
+            if(err)
             {
-                // Send it to the TX Queue
-                ESP_LOG_BUFFER_HEXDUMP(ACK_REPLY_TASK_TAG, &(tx_ack->data), tx_ack->length, ESP_LOG_WARN);
-                xQueueSend(xqUART_tx, tx_ack, (TickType_t)0);
+                ESP_LOG_BUFFER_HEXDUMP(ACK_REPLY_TASK_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_ERROR);
             }
+            
 
 #if STACK_MONITOR
             uxHighWaterMark_TX = uxTaskGetStackHighWaterMark(NULL);

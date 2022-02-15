@@ -55,7 +55,7 @@ extern const char *TCP_SOCK_CLIENT_TAG;
 #define KEEPALIVE_COUNT             8  // [x1] - tries before timing out
 
 #define SOCKET_BUFFER_SIZE          1024
-#define SOCKET_QUEUE_DEPTH          32
+#define SOCKET_QUEUE_DEPTH          16
 
 //TYPE DEFINITIONS
 typedef struct TCPIPMessage tcpip_message_t;

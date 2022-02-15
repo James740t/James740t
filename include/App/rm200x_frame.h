@@ -30,16 +30,21 @@
 #define INCLUDE_vTaskSuspend    1
 
 extern TaskHandle_t xHandle_Frame_Rx;
+extern TaskHandle_t xHandle_Frame_Tx;
 
 extern QueueHandle_t xqFrame_Rx;
+extern QueueHandle_t xqFrame_Tx;
 extern QueueHandle_t xqFrame_Process;
 
 //Definitions
 #define FRAME_PORT              UART_NUM_2
 
-#define FRAME_BUFFER_SIZE       136
+#define FRAME_BUFFER_SIZE       512
 #define FRAME_QUEUE_DEPTH       8
-#define FRAME_PROCESSOR_DEPTH   16
+#define FRAME_PROCESSOR_DEPTH   8
+
+#define FRAME_TX_BUFFER         512
+#define FRAME_TX_QUEUE_DEPTH    8
 
 //Types
 //typedef struct uart_message_t uart_message_t;
@@ -68,7 +73,8 @@ extern "C" {
 //FREERTOS CONTROL ITEMS
 
 //Task Tags
-extern const char *FRAME_TASK_TAG;
+extern const char *FRAME_RX_TAG;
+extern const char *FRAME_TX_TAG;
 
 //defines and constants
 //#define N_ELEMS(x)  (sizeof(x) / sizeof((x)[0]))
@@ -88,11 +94,13 @@ uint8_t CheckFrame(const uint8_t *pt_frame_array);
 
 uint8_t CreateFrame(uint8_t *pt_frame, const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data);
 uint8_t CreateSendFrame(const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data);
+uint8_t SendFrame(uint8_t *p_frame_array, uint8_t p_port);
 
 void init_rm200x_application(void);
 
 //TASKS
 void process_Frame_task(void *arg);
+void transmit_Frame_task(void *arg);
 
 #ifdef __cplusplus
 } // extern "C"

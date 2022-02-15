@@ -413,24 +413,10 @@ void rx_uart_task(void *arg)
     static mqtt_esp_message_t *mqtt_tx = &_mqtt_tx;
     memset(mqtt_tx, 0, sizeof(_mqtt_tx));
 
-    static uint16_t counter = 0;
     char rx_string[UART_BUFFER_SIZE];
 
     // UART IO buffer Queues
     xqUART_rx = xQueueCreate(UART_RX_QUEUE_DEPTH, sizeof(uart_message_t));
-
-    // // wait for all required tasks to come online
-    // while (
-    //     (xqUART_tx == NULL) 
-    //     || (xqUART_rx == NULL) 
-    //     || (xHandle_uart_tx == NULL) 
-    //     || (xHandle_uart_rx == NULL) 
-    //     || (xHandle_uart_isr == NULL) 
-    //     || (xHandle_blink == NULL))
-    // {
-    //     // wait 1 second then check again
-    //     vTaskDelay(100 / portTICK_PERIOD_MS);
-    // }
 
     while (1)
     {
@@ -466,84 +452,81 @@ void rx_uart_task(void *arg)
 
             if (rx_message->IsFrame)
             {
-                //Deal with the incomming frame
+                // Deal with the incomming frame
                 xQueueSend(xqFrame_Rx, &(rx_message->data), (TickType_t)0);
                 ESP_LOG_BUFFER_HEXDUMP(TX_TASK_TAG, &(rx_message->data), 8, ESP_LOG_WARN);
-                
+
                 // Flash LED to show activity
                 xSemaphoreGive(bin_s_sync_blink_task);
             }
 
             int len_str = 0;
-            if ((rx_message->IsHEX) && (!rx_message->IsFrame))
+            if (!rx_message->IsFrame)
             {
-                if (HEX_DELIMITED)
+                if (rx_message->IsHEX)
                 {
-                    // PROCESS INCOMMING UART BYTE MESSAGE STRING:
-                    // clear string buffer
-                    memset(&rx_string, 0, sizeof(rx_string));
-                    len_str = BytesToHexString_hyp_delim((char *)&rx_string, (uint8_t *)&rx_message->data, rx_message->length);
-                    // send this out on the MQTT tele channel
+                    if (HEX_DELIMITED)
+                    {
+                        // PROCESS INCOMMING UART BYTE MESSAGE STRING:
+                        // clear string buffer
+                        memset(&rx_string, 0, sizeof(rx_string));
+                        len_str = BytesToHexString_hyp_delim((char *)&rx_string, (uint8_t *)&rx_message->data, rx_message->length);
+                        // send this out on the MQTT tele channel
 
-                    // start with a clean structure
-                    memset(mqtt_tx, 0, sizeof(mqtt_esp_message_t));
-                    // start building
-                    mqtt_tx->msg_id = 0; // set counter on send in Tx task, set to zero for now
-                    mqtt_tx->qos = 0;    // set required QoS level here
-                    // set the topic here
-                    mqtt_tx->topic_len = build_topic((mqtt_topic_t *)&mqtt_tx->topic_detail, MQTT_TELE_PREFIX, MQTT_BASE_TOPIC, "hex_delimited");
-                    strcpy((char *)&mqtt_tx->topic, (char *)&mqtt_tx->topic_detail.topic);
-                    mqtt_tx->data_len = len_str; // strlen(input_string);
-                    mqtt_tx->total_data_len = mqtt_tx->data_len;
-                    memcpy(&mqtt_tx->data, &rx_string, mqtt_tx->data_len);
-                    // SEND
-                    mqtt_send(mqtt_tx);
+                        // start with a clean structure
+                        memset(mqtt_tx, 0, sizeof(mqtt_esp_message_t));
+                        // start building
+                        mqtt_tx->msg_id = 0; // set counter on send in Tx task, set to zero for now
+                        mqtt_tx->qos = 0;    // set required QoS level here
+                        // set the topic here
+                        mqtt_tx->topic_len = build_topic((mqtt_topic_t *)&mqtt_tx->topic_detail, MQTT_TELE_PREFIX, MQTT_BASE_TOPIC, "hex_delimited");
+                        strcpy((char *)&mqtt_tx->topic, (char *)&mqtt_tx->topic_detail.topic);
+                        mqtt_tx->data_len = len_str; // strlen(input_string);
+                        mqtt_tx->total_data_len = mqtt_tx->data_len;
+                        memcpy(&mqtt_tx->data, &rx_string, mqtt_tx->data_len);
+                        // SEND
+                        mqtt_send(mqtt_tx);
+                    }
+                    else
+                    {
+                        // NON-DELIMITED VERSION
+                        // clear string buffer
+                        memset(&rx_string, 0, sizeof(rx_string));
+                        len_str = BytesToHexString((char *)&rx_string, (uint8_t *)&rx_message->data, rx_message->length);
+                        // send this out on the MQTT tele channel
+                        // start with a clean structure
+                        memset(mqtt_tx, 0, sizeof(mqtt_esp_message_t));
+                        // start building
+                        mqtt_tx->msg_id = 0; // set counter on send in Tx task, set to zero for now
+                        mqtt_tx->qos = 0;    // set required QoS level here
+                        // set the topic here
+                        mqtt_tx->topic_len = build_topic((mqtt_topic_t *)&mqtt_tx->topic_detail, MQTT_TELE_PREFIX, MQTT_BASE_TOPIC, "hex");
+                        strcpy((char *)&mqtt_tx->topic, (char *)&mqtt_tx->topic_detail.topic);
+                        mqtt_tx->data_len = len_str; // strlen(input_string);
+                        mqtt_tx->total_data_len = mqtt_tx->data_len;
+                        memcpy(&mqtt_tx->data, &rx_string, mqtt_tx->data_len);
+
+                        // SEND
+                        mqtt_send(mqtt_tx);
+                    }
                 }
                 else
                 {
-                    // NON-DELIMITED VERSION
-                    // clear string buffer
-                    memset(&rx_string, 0, sizeof(rx_string));
-                    len_str = BytesToHexString((char *)&rx_string, (uint8_t *)&rx_message->data, rx_message->length);
-                    // send this out on the MQTT tele channel
+                    // TEXT VERSION:
                     // start with a clean structure
                     memset(mqtt_tx, 0, sizeof(mqtt_esp_message_t));
                     // start building
                     mqtt_tx->msg_id = 0; // set counter on send in Tx task, set to zero for now
                     mqtt_tx->qos = 0;    // set required QoS level here
                     // set the topic here
-                    mqtt_tx->topic_len = build_topic((mqtt_topic_t *)&mqtt_tx->topic_detail, MQTT_TELE_PREFIX, MQTT_BASE_TOPIC, "hex");
+                    mqtt_tx->topic_len = build_topic((mqtt_topic_t *)&mqtt_tx->topic_detail, MQTT_TELE_PREFIX, MQTT_BASE_TOPIC, "xxx ascii");
                     strcpy((char *)&mqtt_tx->topic, (char *)&mqtt_tx->topic_detail.topic);
-                    mqtt_tx->data_len = len_str; // strlen(input_string);
+                    mqtt_tx->data_len = rx_message->length; // strlen(input_string);
                     mqtt_tx->total_data_len = mqtt_tx->data_len;
-                    memcpy(&mqtt_tx->data, &rx_string, mqtt_tx->data_len);
-
+                    memcpy(&mqtt_tx->data, (char *)&rx_message->data, mqtt_tx->data_len);
                     // SEND
                     mqtt_send(mqtt_tx);
                 }
-            }
-            else
-            {
-                // TEXT VERSION:
-                // start with a clean structure
-                memset(mqtt_tx, 0, sizeof(mqtt_esp_message_t));
-                // start building
-                mqtt_tx->msg_id = 0; // set counter on send in Tx task, set to zero for now
-                mqtt_tx->qos = 0;    // set required QoS level here
-                // set the topic here
-                mqtt_tx->topic_len = build_topic((mqtt_topic_t *)&mqtt_tx->topic_detail, MQTT_TELE_PREFIX, MQTT_BASE_TOPIC, "ascii");
-                strcpy((char *)&mqtt_tx->topic, (char *)&mqtt_tx->topic_detail.topic);
-                mqtt_tx->data_len = rx_message->length; // strlen(input_string);
-                mqtt_tx->total_data_len = mqtt_tx->data_len;
-                memcpy(&mqtt_tx->data, (char *)&rx_message->data, mqtt_tx->data_len);
-                // SEND
-                mqtt_send(mqtt_tx);
-            }
-
-            // Loop counter around if necessary
-            if (counter > (UINT16_MAX - 1))
-            {
-                counter = 0;
             }
         }
 #ifdef STACK_MONITOR

@@ -83,17 +83,17 @@ extern const char *FRAME_TX_TAG;
 
 //Prototypes
 uint8_t CreateRollingCounter(void);
-uint8_t Get_Frame_Length (const uint8_t *pt_frame_array);
-uint8_t Get_Frame_CRC (const uint8_t *pt_frame_array);
-uint8_t Get_Frame_Payload (const uint8_t *pt_frame_array);
-uint8_t Get_Frame_Intent (const uint8_t *pt_frame_array);
-uint8_t Get_Rolling_Counter (const uint8_t *pt_frame_array);
+uint8_t Get_Frame_Length (uint8_t *pt_frame_array);
+uint8_t Get_Frame_CRC (uint8_t *pt_frame_array);
+uint8_t Get_Frame_Payload (uint8_t *pt_frame_array);
+uint8_t Get_Frame_Intent (uint8_t *pt_frame_array);
+uint8_t Get_Rolling_Counter (uint8_t *pt_frame_array);
 
-uint8_t Calculate_Checksum(const uint8_t *pt_frame_array);
-uint8_t CheckFrame(const uint8_t *pt_frame_array);
+uint8_t Calculate_Checksum(uint8_t *pt_frame_array);
+uint8_t CheckFrame(uint8_t *pt_frame_array);
 
-uint8_t CreateFrame(uint8_t *pt_frame, const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data);
-uint8_t CreateSendFrame(const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data);
+uint8_t CreateFrame(uint8_t *pt_frame, uint8_t pt_intent, uint8_t *pt_data, uint8_t data_size);
+uint8_t CreateSendFrame(uint8_t pt_intent, uint8_t *pt_data, uint8_t data_size);
 uint8_t SendFrame(uint8_t *p_frame_array, uint8_t p_port);
 
 void init_rm200x_application(void);

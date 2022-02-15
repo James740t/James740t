@@ -12,6 +12,7 @@
 
 //Function Headers
 #include "JSON/json-maker.h"
+#include "JSON/tiny-json.h"
 
 //ESP Headers
 
@@ -19,11 +20,15 @@
 
 //Application Headers
 #include "App/rm200x_frame_definitions.h"
+#include "App/rm200x_frame.h"
 
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+//Task Tags
+extern const char *PROTOCOL_TAG;
 
 // Definitions
 #define JSON_STRING_LENGTH      512
@@ -38,6 +43,11 @@ char* intent_0x10_json(char *pt_str_json, uint8_t *frame);
 char* intent_0x11_json(char *pt_str_json, uint8_t *frame);
 char *intent_0x21_json(char *pt_str_json, uint8_t *frame);
 
+
+
+//Command Prototypes
+uint8_t json_volume_set(char *p_str);
+uint8_t json_mute_set(char *p_str);
 
 
 #ifdef __cplusplus

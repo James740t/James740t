@@ -1,5 +1,8 @@
 #include "App/rm200x_protocol.h"
 
+//Task Tags
+const char *PROTOCOL_TAG = "PROTOCOL";
+
 /******************************************************************************************/
 // UART PROTOCOL - JSON
 /******************************************************************************************/
@@ -96,6 +99,107 @@ char *intent_0x21_json(char *pt_str_json, uint8_t *frame)
     return pt_str_json;
 }
 
+
+/******************************************************************************************/
+// COMMAND INPUTS - PUBLIC FUNCTIONS
+/******************************************************************************************/
+
+uint8_t json_volume_set(char *p_str)
+{
+    json_t mem[32]; // Number of tokens
+    json_t const* json = json_create( p_str, mem, sizeof mem / sizeof *mem );
+    if ( !json ) 
+    {
+        return 0xFF;
+    }
+
+    json_t const* Volume = json_getProperty( json, "Volume" );
+    if ( !Volume || JSON_INTEGER != json_getType( Volume ) ) 
+    {
+        return 0xFF;
+    }
+    int const vol = (int)json_getInteger( Volume );
+
+    // build and send frame
+    static uint8_t _dat[2];
+    //static uint8_t *pt_dat = _dat;
+    _dat[0] = (uint8_t)0x09;
+    _dat[1] = (uint8_t)vol;
+    
+    uint8_t err = CreateSendFrame(0x90, _dat, 4);
+
+    if(err)
+    {
+        ESP_LOG_BUFFER_HEXDUMP(PROTOCOL_TAG, p_str, strlen((char *)p_str), ESP_LOG_ERROR);
+    }
+
+
+    json_t const* Mute = json_getProperty( json, "Mute" );
+    if ( !Mute || JSON_BOOLEAN != json_getType( Mute ) ) 
+    {
+        return 0xFF;
+    }
+    bool const mut = (bool)json_getBoolean( Mute );
+
+    // build and send frame
+    //static uint8_t _dat[2];
+    //static uint8_t *pt_dat = _dat;
+    _dat[0] = 0x02;
+    _dat[1] = mut ? 1 : 0;
+    
+    //uint8_t err = 
+    CreateSendFrame(0x90, _dat, 4);
+
+    if(err)
+    {
+        ESP_LOG_BUFFER_HEXDUMP(PROTOCOL_TAG, p_str, strlen((char *)p_str), ESP_LOG_ERROR);
+    }
+
+
+
+    // json_t const* age = json_getProperty( json, "age" );
+    // if ( !age || JSON_INTEGER != json_getType( age ) ) 
+    // {
+    //     return -1;
+    // }
+    // int const ageVal = (int)json_getInteger( age );
+    // printf( "Age: %d.\n", ageVal );
+
+
+    return err;
+}
+
+uint8_t json_mute_set(char *p_str)
+{
+    json_t mem[32]; // Number of tokens
+    json_t const* json = json_create( p_str, mem, sizeof mem / sizeof *mem );
+    if ( !json ) 
+    {
+        return 0xFF;
+    }
+
+    json_t const* Mute = json_getProperty( json, "Mute" );
+    if ( !Mute || JSON_BOOLEAN != json_getType( Mute ) ) 
+    {
+        return 0xFF;
+    }
+    bool const mut = (bool)json_getBoolean( Mute );
+
+    // build and send frame
+    static uint8_t _dat[2];
+    //static uint8_t *pt_dat = _dat;
+    _dat[0] = 0x02;
+    _dat[1] = mut ? 1 : 0;
+    
+    uint8_t err = CreateSendFrame(0x90, _dat, 4);
+
+    if(err)
+    {
+        ESP_LOG_BUFFER_HEXDUMP(PROTOCOL_TAG, p_str, strlen((char *)p_str), ESP_LOG_ERROR);
+    }
+
+    return err;
+}
 /******************************************************************************************/
 // UART PROTOCOL - JSON -- END --
 /******************************************************************************************/

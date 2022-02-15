@@ -61,40 +61,45 @@ uint8_t CreateRollingCounter(void)
     }
 }
 
-uint8_t Calculate_Checksum(const uint8_t *pt_frame_array)
+uint8_t Calculate_Checksum(uint8_t *pt_frame_array)
 {
-    int _crc = 0x100;
+    uint8_t len = pt_frame_array[2];
+    uint8_t *p_payload = (uint8_t *)&pt_frame_array[2];
+    uint8_t _sum = 0;
 
-    for (int i = 0; i < pt_frame_array[2]; i++)
+    for (int i = 0; i <= len; i++)
     {
-        _crc -= (int8_t)pt_frame_array[i + 3];
+        _sum += *p_payload++;
     }
 
-    return (uint8_t)_crc;
+    uint8_t crc = (uint8_t)(0x100 - _sum);
+    pt_frame_array[len + 3] = crc;
+
+    return crc;
 }
 
-uint8_t Get_Frame_Length (const uint8_t *pt_frame_array)
+uint8_t Get_Frame_Length (uint8_t *pt_frame_array)
 {
     uint8_t length_in = pt_frame_array[2];
     return length_in + 4;
 }
 
-uint8_t Get_Frame_Intent (const uint8_t *pt_frame_array)
+uint8_t Get_Frame_Intent (uint8_t *pt_frame_array)
 {
     return pt_frame_array[4];
 }
 
-uint8_t Get_Frame_Payload (const uint8_t *pt_frame_array)
+uint8_t Get_Frame_Payload (uint8_t *pt_frame_array)
 {
     return pt_frame_array[2];
 }
 
-uint8_t Get_Frame_CRC (const uint8_t *pt_frame_array)
+uint8_t Get_Frame_CRC ( uint8_t *pt_frame_array)
 {
     return pt_frame_array[2 + pt_frame_array[2] + 1];
 }
 
-uint8_t Get_Rolling_Counter (const uint8_t *pt_frame_array)
+uint8_t Get_Rolling_Counter (uint8_t *pt_frame_array)
 {
     return pt_frame_array[3];
 }
@@ -105,7 +110,7 @@ bit 1 == length error
 bit 2 == bad crc
 bit 3 == unknown intent
 */
-uint8_t CheckFrame(const uint8_t *pt_frame_array)
+uint8_t CheckFrame(uint8_t *pt_frame_array)
 {
     byte error;
     error.byte = 0x00;
@@ -130,17 +135,19 @@ uint8_t CheckFrame(const uint8_t *pt_frame_array)
     return error.byte;
 }
 
-uint8_t CreateFrame(uint8_t *pt_frame, const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data)
+uint8_t CreateFrame(uint8_t *pt_frame, uint8_t pt_intent, uint8_t *pt_data, uint8_t data_size)
 {    
     uint8_t index = 0;
     
-    pt_frame[index++] = 0xFF;
-    pt_frame[index++] = 0x55;
-    pt_frame[index++] = data_size;
-    pt_frame[index++] = CreateRollingCounter();
-    pt_frame[index++] = pt_intent;
+    pt_frame[index++] = 0xFF;                   // 0
+    pt_frame[index++] = 0x55;                   // 1
+    pt_frame[index++] = data_size;              // 2
+    pt_frame[index++] = CreateRollingCounter(); // 3
+    pt_frame[index++] = pt_intent;              // 4
     //Add data here
-    memcpy(&pt_frame[index], pt_data, data_size);
+
+
+    memcpy(&pt_frame[index], pt_data, data_size);       // 5 start
     //Add the checksum finally
     index += data_size;
     uint8_t crc = Calculate_Checksum(pt_frame);
@@ -150,19 +157,17 @@ uint8_t CreateFrame(uint8_t *pt_frame, const uint8_t pt_intent, const uint8_t da
     byte check;
     check.byte = CheckFrame(pt_frame);
 
-    ESP_LOG_BUFFER_HEXDUMP(FRAME_RX_TAG, pt_frame, index, ESP_LOG_INFO);
-
     return check.byte;
    //Build OK returns the whole frame length else returns -1 == NOK 
 }
 
-uint8_t CreateSendFrame(const uint8_t pt_intent, const uint8_t data_size, const uint8_t *pt_data)
+uint8_t CreateSendFrame(uint8_t pt_intent, uint8_t *pt_data, uint8_t data_size)
 {
     static uint8_t _frame[FRAME_BUFFER_SIZE];
     static uint8_t *frame  = (uint8_t *)&_frame;;
     memset(frame, 0x00, sizeof(_frame));
 
-    uint8_t err = CreateFrame(frame, pt_intent, data_size, pt_data);
+    uint8_t err = CreateFrame(frame, pt_intent, pt_data, data_size);
 
     if (!err)
     {
@@ -193,14 +198,17 @@ uint8_t SendFrame(uint8_t *p_frame_array, uint8_t p_port)
 
     // Check the frame
     byte check;
-    check.byte = CheckFrame((const uint8_t *)&(tx_uart->data));
+    check.byte = CheckFrame((uint8_t *)&(tx_uart->data));
 
-    ESP_LOGI(FRAME_TX_TAG, "Frame TX Error : 0x%02X", check.byte);
     if (!check.byte)
     {
         // Send it to the TX Queue
         ESP_LOG_BUFFER_HEXDUMP(FRAME_TX_TAG, &(tx_uart->data), tx_uart->length, ESP_LOG_WARN);
         xQueueSend(xqUART_tx, tx_uart, (TickType_t)0);
+    }
+    else
+    {
+        ESP_LOGE(FRAME_TX_TAG, "Frame TX Error : 0x%02X", check.byte);
     }
 
     return check.byte;
@@ -215,7 +223,8 @@ void init_rm200x_application(void)
     // SETUP REPORTING LEVELS
     // Frame Module
     esp_log_level_set(FRAME_RX_TAG, ESP_LOG_NONE);
-    esp_log_level_set(FRAME_TX_TAG, ESP_LOG_INFO);
+    esp_log_level_set(FRAME_TX_TAG, ESP_LOG_WARN);
+    esp_log_level_set(PROTOCOL_TAG, ESP_LOG_INFO);
     // ACK Module
     esp_log_level_set(ACK_REPLY_TASK_TAG, ESP_LOG_NONE);
     esp_log_level_set(ACK_PROCESS_TASK_TAG, ESP_LOG_NONE);
@@ -313,8 +322,7 @@ void process_Frame_task(void *arg)
             }
 
             if (CheckFrame(frame_in_buffer) == 0x00) // Frame is good
-            {
-                
+            {  
 /******************************************************************************************************************************************/
                 // Process the incomming intents i.e. do stuff with the data received
 /******************************************************************************************************************************************/
@@ -367,7 +375,7 @@ void transmit_Frame_task(void *arg)
 #endif
 
     // Initialise things here
-    uint8_t err = 0;
+    int err = 0;
     int _len = 0;
 
     static uint8_t _incomming[FRAME_TX_BUFFER];
@@ -425,10 +433,20 @@ void transmit_Frame_task(void *arg)
                 // Is it a JSON special request that needs translation and further - it will start with " or {
                 if (
                        (incomming[0] == 0x22) 
-                    || (incomming[1] == 0x7B) 
+                    || (incomming[0] == 0x7B) 
                     )
                 {
                     // Extract the intent structure and the process it.
+                    err = json_volume_set((char *)incomming);
+                    if (err)
+                    {
+                        ESP_LOG_BUFFER_HEXDUMP(FRAME_TX_TAG, incomming, strlen((char *)incomming), ESP_LOG_ERROR);
+                    }
+                    // err = json_mute_set((char *)incomming);
+                    // if (err)
+                    // {
+                    //     ESP_LOG_BUFFER_HEXDUMP(FRAME_TX_TAG, incomming, strlen((char *)incomming), ESP_LOG_ERROR);
+                    // }
 
                 }
             }

@@ -64,17 +64,16 @@ uint8_t CreateRollingCounter(void)
 uint8_t Calculate_Checksum(uint8_t *pt_frame_array)
 {
     uint8_t len = pt_frame_array[2];
-    uint8_t *p_payload = (uint8_t *)&pt_frame_array[2];
+    uint8_t *p_payload = (uint8_t *)&pt_frame_array[3]; // Start of CRC calc data - payload
     uint8_t _sum = 0;
 
-    for (int i = 0; i <= len; i++)
+    for (int i = 1; i <= len; i++)  // Length so count from 1 to length
     {
         _sum += *p_payload++;
     }
 
     uint8_t crc = (uint8_t)(0x100 - _sum);
-    pt_frame_array[len + 3] = crc;
-
+    //pt_frame_array[len + 3] = crc;
     return crc;
 }
 
@@ -127,10 +126,14 @@ uint8_t CheckFrame(uint8_t *pt_frame_array)
     uint8_t crc_in = pt_frame_array[crc_idx];
     uint8_t crc_calc = Calculate_Checksum(pt_frame_array);
 
-    //ESP_LOGI(FRAME_RX_TAG, "Pay. Len: 0x%02X, Msg. Len:: 0x%02X", length_in, crc_idx + 1);
-    //ESP_LOGI(FRAME_RX_TAG, "CRC in: 0x%02X, CRC calc: 0x%02X", crc_in, crc_calc);
-
     if (crc_in != crc_calc) error.bits.bit2 = 1;
+
+    if(error.byte)
+    {
+        ESP_LOGE(FRAME_RX_TAG, "ERROR BYTE: 0x%02X", error.byte);
+        ESP_LOGE(FRAME_RX_TAG, "Pay. Len: 0x%02X, Msg. Len:: 0x%02X", length_in, crc_idx + 1);
+        ESP_LOGE(FRAME_RX_TAG, "CRC in: 0x%02X, CRC calc: 0x%02X", crc_in, crc_calc);
+    }
 
     return error.byte;
 }
@@ -146,19 +149,25 @@ uint8_t CreateFrame(uint8_t *pt_frame, uint8_t pt_intent, uint8_t *pt_data, uint
     pt_frame[index++] = pt_intent;              // 4
     //Add data here
 
-
-    memcpy(&pt_frame[index], pt_data, data_size);       // 5 start
+    memcpy(&pt_frame[index], pt_data, data_size);   // 5 start
     //Add the checksum finally
-    index += data_size;
+    //index += data_size;
     uint8_t crc = Calculate_Checksum(pt_frame);
-    pt_frame[index++] = crc;
+    pt_frame[2 + data_size + 1] = crc;
 
     // Check the frame
     byte check;
     check.byte = CheckFrame(pt_frame);
 
+    //ESP_LOG_BUFFER_HEXDUMP("DEBUG MESS:", pt_frame, Get_Frame_Length(pt_frame), ESP_LOG_ERROR);
+
+    if (check.byte)
+    {
+        ESP_LOGE(FRAME_TX_TAG, "Bad frame Build : 0x%02X", check.byte);
+    }
+
     return check.byte;
-   //Build OK returns the whole frame length else returns -1 == NOK 
+   //Build OK returns the whole frame length else returns 0x00 else > 0 == NOK
 }
 
 uint8_t CreateSendFrame(uint8_t pt_intent, uint8_t *pt_data, uint8_t data_size)
@@ -173,6 +182,10 @@ uint8_t CreateSendFrame(uint8_t pt_intent, uint8_t *pt_data, uint8_t data_size)
     {
         // Send the Frame out onto the UART
         err = SendFrame(frame, FRAME_PORT);
+    }
+    else
+    {
+        ESP_LOGE(FRAME_TX_TAG, "Frame Send Error : 0x%02X", err);
     }
     return err;
 }
@@ -222,14 +235,14 @@ void init_rm200x_application(void)
 {
     // SETUP REPORTING LEVELS
     // Frame Module
-    esp_log_level_set(FRAME_RX_TAG, ESP_LOG_NONE);
-    esp_log_level_set(FRAME_TX_TAG, ESP_LOG_WARN);
+    esp_log_level_set(FRAME_RX_TAG, ESP_LOG_ERROR);
+    esp_log_level_set(FRAME_TX_TAG, ESP_LOG_ERROR);
     esp_log_level_set(PROTOCOL_TAG, ESP_LOG_INFO);
     // ACK Module
     esp_log_level_set(ACK_REPLY_TASK_TAG, ESP_LOG_NONE);
     esp_log_level_set(ACK_PROCESS_TASK_TAG, ESP_LOG_NONE);
     // Audio Module
-    esp_log_level_set(AUDIO_TASK_TAG, ESP_LOG_INFO);
+    esp_log_level_set(AUDIO_TASK_TAG, ESP_LOG_WARN);
 
     // SETUP ALL QUEUES
     // Setup the frame Rx Queue
@@ -294,6 +307,8 @@ void process_Frame_task(void *arg)
     static uint8_t *frame_ack_buffer = _frame_ack_buffer;
     memset(frame_ack_buffer, 0x00, sizeof(_frame_ack_buffer));
 
+    uint8_t err = 0;
+
     // Task loop
     while (1)
     {
@@ -305,24 +320,25 @@ void process_Frame_task(void *arg)
         // Block until a message is put on the queue
         if (xQueueReceive(xqFrame_Rx, frame_in_buffer, (TickType_t)portMAX_DELAY) == pdPASS)
         {
-            ESP_LOG_BUFFER_HEXDUMP(FRAME_RX_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_WARN);
+            ESP_LOG_BUFFER_HEXDUMP(FRAME_RX_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_INFO);
 
             // Copy the incomming buffer
             memcpy(frame_ack_buffer, frame_in_buffer, sizeof(_frame_in_buffer));
             memcpy(frame_out_buffer, frame_in_buffer, sizeof(_frame_in_buffer));
 
-            // Get incomming intent:
-            uint8_t intent = Get_Frame_Intent(frame_in_buffer);
-
-            // It is a normal incomming message so we need to ACK it
-            if (intent != CMD_ACK)
-            {
-                // ESP_LOG_BUFFER_HEXDUMP(FRAME_RX_TAG, frame_ack_buffer, Get_Frame_Length(frame_ack_buffer), ESP_LOG_WARN);
-                xQueueSend(xqACK_Send_Reply, frame_ack_buffer, (TickType_t)0);
-            }
-
-            if (CheckFrame(frame_in_buffer) == 0x00) // Frame is good
+            err = CheckFrame(frame_in_buffer);
+            if (!err) // Frame is good
             {  
+                // Get incomming intent:
+                uint8_t intent = Get_Frame_Intent(frame_in_buffer);
+
+                // It is a normal incomming message so we need to ACK it
+                if (intent != CMD_ACK)
+                {
+                    //ESP_LOG_BUFFER_HEXDUMP(FRAME_RX_TAG, frame_ack_buffer, Get_Frame_Length(frame_ack_buffer), ESP_LOG_WARN);
+                    xQueueSend(xqACK_Send_Reply, frame_ack_buffer, (TickType_t)0);
+                }
+
 /******************************************************************************************************************************************/
                 // Process the incomming intents i.e. do stuff with the data received
 /******************************************************************************************************************************************/
@@ -334,21 +350,26 @@ void process_Frame_task(void *arg)
                     xQueueSend(xqACK_Process, frame_ack_buffer, (TickType_t)0);
                     break;
                 }
-                case CMD_AUDIO:         // Volume and Mute status
-                case CMD_EQ:            // Tone Controls
-                case CMD_POWER_STATE:   // Power status
-                // INSERT HERE
+                // INSERT INCOMMING INTENTS TO BE PROCESSED HERE
+                case CMD_AUDIO:       // Volume and Mute status
+                case CMD_EQ:          // Tone Controls
+                case CMD_POWER_STATE: // Power status
                 {
+                    // Send for processing - in our case Json and MQTT
+                    //ESP_LOG_BUFFER_HEXDUMP("FRAME RX DEBUG TAG", frame_out_buffer, Get_Frame_Length(frame_out_buffer), ESP_LOG_WARN);
                     xQueueSend(xqFrame_Process, frame_out_buffer, (TickType_t)0);
                     break;
                 }
-
                 default:
                 {
                     // do nothing
                     break;
                 }
                 }
+            }
+            else
+            {
+                ESP_LOGE(FRAME_RX_TAG, "BAD FRAME - Error code: 0x%02X", err);
             }
 
 #if STACK_MONITOR

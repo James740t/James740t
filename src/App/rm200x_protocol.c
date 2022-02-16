@@ -130,10 +130,11 @@ uint8_t json_volume_set(char *p_str)
 
     if(err)
     {
+        ESP_LOGE(PROTOCOL_TAG, "BAD FRAME - Error code: 0x%02X", err);
         ESP_LOG_BUFFER_HEXDUMP(PROTOCOL_TAG, p_str, strlen((char *)p_str), ESP_LOG_ERROR);
     }
 
-
+///////////////////////////////////////////////////////////////////////////////////////////////////
     json_t const* Mute = json_getProperty( json, "Mute" );
     if ( !Mute || JSON_BOOLEAN != json_getType( Mute ) ) 
     {
@@ -154,7 +155,7 @@ uint8_t json_volume_set(char *p_str)
     {
         ESP_LOG_BUFFER_HEXDUMP(PROTOCOL_TAG, p_str, strlen((char *)p_str), ESP_LOG_ERROR);
     }
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
     // json_t const* age = json_getProperty( json, "age" );

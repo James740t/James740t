@@ -34,13 +34,13 @@ void app_main() //Called from an "internal" main.c
     ESP_LOGI("APPLICATION", "[APP] IDF version: %s", esp_get_idf_version());
 
     // Set basic logging level to warnings -> errors
-    esp_log_level_set("*", ESP_LOG_WARN);
+    esp_log_level_set("*", ESP_LOG_ERROR);
     // SET SPECIFIC MODULE LOGGING LEVELS
     // WIFI Module
-	esp_log_level_set(WIFI_TAG, ESP_LOG_NONE);
+	esp_log_level_set(WIFI_TAG, ESP_LOG_ERROR);
     // MQTT Module
 	esp_log_level_set(MQTT_RX_TASK_TAG, ESP_LOG_INFO);
-    esp_log_level_set(MQTT_TX_TASK_TAG, ESP_LOG_NONE);
+    esp_log_level_set(MQTT_TX_TASK_TAG, ESP_LOG_INFO);
     // UART Module
 	esp_log_level_set(TX_TASK_TAG, ESP_LOG_NONE);
     esp_log_level_set(RX_TASK_TAG, ESP_LOG_NONE);
@@ -81,6 +81,8 @@ void app_main() //Called from an "internal" main.c
 
     //fs_test();
     //fs_finalise();
+
+    // IS EVERYTHING NECESSARY RUNNING
     
 }
 

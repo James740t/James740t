@@ -75,7 +75,7 @@ void mqtt_send_json(const char *mqtt_text)
     // Flash LED to show activity
     xSemaphoreGive(bin_s_sync_blink_task);
 
-    ESP_LOGI(AUDIO_TASK_TAG, "Message: %s/%s - data bytes = %d", mqtt_msg->topic, mqtt_msg->data, mqtt_msg->data_len);
+    ESP_LOGW(AUDIO_TASK_TAG, "MQTT Message: %s/%s - data bytes = %d", mqtt_msg->topic, mqtt_msg->data, mqtt_msg->data_len);
 }
 
 /******************************************************************************************/
@@ -113,7 +113,7 @@ void audio_IN_task(void *arg)
         // Block until a message is put on the queue
         if (xQueueReceive(xqFrame_Process, frame_in_buffer, (TickType_t)portMAX_DELAY) == pdPASS)
         {
-            //ESP_LOG_BUFFER_HEXDUMP(AUDIO_TASK_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_WARN);
+            ESP_LOG_BUFFER_HEXDUMP(AUDIO_TASK_TAG, frame_in_buffer, Get_Frame_Length(frame_in_buffer), ESP_LOG_INFO);
             uint8_t intent = Get_Frame_Intent(frame_in_buffer);
 
             switch (intent)

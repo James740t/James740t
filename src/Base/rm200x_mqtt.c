@@ -29,7 +29,7 @@ UBaseType_t uxHighWaterMark_TX;
         // #ifdef STACK_MONITOR
         //     /* Inspect our own high water mark on entering the task. */
         //     uxHighWaterMark_RX = uxTaskGetStackHighWaterMark( NULL );
-        //     printf("MQTT RX STACK HW (START) = %d", uxHighWaterMark_RX);
+        //     printf("MQTT RX STACK HW (START) = %d\r\n", uxHighWaterMark_RX);
         // #endif
 
         // #ifdef STACK_MONITOR
@@ -103,7 +103,7 @@ int build_topic(mqtt_topic_t *pt_topic, const char *prefix, const char *topic, c
     strcat((char *)&pt_topic->topic, "\0");
 
     int length = (int)strlen(pt_topic->topic);
-    ESP_LOGI(MQTT_TASK_TAG, "COMPLETE TOPIC = %d, %s\r\n", length, (char *)pt_topic->topic);
+    ESP_LOGI(MQTT_TASK_TAG, "COMPLETE TOPIC = %d, %s", length, (char *)pt_topic->topic);
 
     return length;
 }
@@ -124,7 +124,7 @@ int complete_topic(mqtt_topic_t *pt_topic_data)
 
     int length = (int)strlen(pt_topic_data->topic);
 
-    ESP_LOGI(MQTT_TASK_TAG, "COMPLETE TOPIC = %d, %s\r\n", length, (char *)pt_topic_data->topic);
+    ESP_LOGI(MQTT_TASK_TAG, "COMPLETE TOPIC = %d, %s", length, (char *)pt_topic_data->topic);
 
     return length;
 }
@@ -575,7 +575,7 @@ void mqtt_tx_task(void *arg)
         {
             mqtt_tx->msg_id = tx_counter++;     // add the counter on send
             //Now ready to publish
-            ESP_LOGI(MQTT_TX_TASK_TAG, "Message: %s/%s - topic bytes = %d data bytes = %d\r\n", mqtt_tx->topic, mqtt_tx->data, mqtt_tx->topic_len, mqtt_tx->data_len);
+            ESP_LOGI(MQTT_TX_TASK_TAG, "Message: %s/%s - topic bytes = %d data bytes = %d", mqtt_tx->topic, mqtt_tx->data, mqtt_tx->topic_len, mqtt_tx->data_len);
 
             // Immediately publish the message from the queue
             mqtt_tx->msg_id = esp_mqtt_client_publish(mqtt_client, mqtt_tx->topic, mqtt_tx->data, 0, mqtt_tx->qos, 0);

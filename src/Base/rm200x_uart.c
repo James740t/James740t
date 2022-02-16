@@ -353,13 +353,13 @@ void tx_uart_task(void *arg)
             int tx_delay_ms = UART_FIXED_MIN_TX_DELAY_MS + UART_VARIABLE_TX_DELAY;
                 vTaskDelay(tx_delay_ms / portTICK_PERIOD_MS);    //5 ms for now
             // Log if necessary
-            ESP_LOGI(TX_TASK_TAG, "UART TX - ID: %d, Port: %d, Data length: %d, Message dwell: %d mS\r\nData: %s\r\n", 
+            ESP_LOGI(TX_TASK_TAG, "UART TX - ID: %d, Port: %d, Data length: %d, Message dwell: %d mS\r\nData: %s", 
                 tx_message->Message_ID, tx_message->port, tx_message->length, tx_delay_ms, tx_message->data);
 
             if (tx_error)
             {
                 //ERROR - so do something here
-                ESP_LOGE(TX_TASK_TAG, "ERROR - INCOMPLETE MESSAGE SENT: Bytes written = %d\r\nUART TX - ID: %d, Port: %d, Data length: %d, Message dwell: %d mS\r\nData: %s\r\n", 
+                ESP_LOGE(TX_TASK_TAG, "ERROR - INCOMPLETE MESSAGE SENT: Bytes written = %d\r\nUART TX - ID: %d, Port: %d, Data length: %d, Message dwell: %d mS\r\nData: %s", 
                         txBytes, tx_message->Message_ID, tx_message->port, tx_message->length, tx_delay_ms, tx_message->data);
                 printf("UART ERROR - INCOMPLETE MESSAGE SENT\r\n");
 

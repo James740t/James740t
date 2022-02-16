@@ -289,9 +289,9 @@ void init_uart(void)
     // Rx Task - held with RX Queue - data ready for processing
     // Rx Task stack size larger because it will be responsible for frame assembly and marshalling
     // same applies to the event stack below...
-    xTaskCreate(rx_uart_task, RX_TASK_TAG, 1024*5, NULL, configMAX_PRIORITIES-1, &xHandle_uart_rx);
+    xTaskCreate(rx_uart_task, RX_TASK_TAG, 1024*5, NULL, configMAX_PRIORITIES, &xHandle_uart_rx);
     // Create a task to handler UART event from ISR - JIT managed - better !
-    xTaskCreate(uart_event_task, UART_ISR_TASK_TAG, 1024*5, NULL, configMAX_PRIORITIES-2, &xHandle_uart_isr);
+    xTaskCreate(uart_event_task, UART_ISR_TASK_TAG, 1024*5, NULL, configMAX_PRIORITIES, &xHandle_uart_isr);
 }
 
 void tx_uart_task(void *arg)

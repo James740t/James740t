@@ -40,7 +40,7 @@ void initiate_template(void)
 {
     //esp_log_level_set(TASK_TASK_TAG, ESP_LOG_NONE);
 
-    //xTaskCreate(task_template, TASK_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES-10, &xHandle_task);
+    //xTaskCreate(task_template, TASK_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_task);
 }
 
 void task_template (void *arg)

@@ -40,7 +40,7 @@ void blink_init(uint16_t p_flash_time)
     
     esp_log_level_set(BLINK_TASK_TAG, ESP_LOG_NONE);
 
-    xTaskCreate(blink_led_task, BLINK_TASK_TAG, 1024*3, (void *)&task_parameters_flash_time, configMAX_PRIORITIES-3, &xHandle_blink);
+    xTaskCreate(blink_led_task, BLINK_TASK_TAG, 1024*3, (void *)&task_parameters_flash_time, configMAX_PRIORITIES, &xHandle_blink);
 }
 
 void blink_led_task(void *on_time)

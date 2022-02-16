@@ -261,23 +261,23 @@ void init_rm200x_application(void)
 
     //SETUP AND START ALL TASKS
     // Frame marshalling
-    xTaskCreate(process_Frame_task, FRAME_RX_TAG, 1024*3, NULL, configMAX_PRIORITIES - 10, &xHandle_Frame_Rx);
+    xTaskCreate(process_Frame_task, FRAME_RX_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_Frame_Rx);
     configASSERT(xHandle_Frame_Rx);
 
     // Frame Out Task - Process all frame transmissions
-    xTaskCreate(transmit_Frame_task, FRAME_TX_TAG, 1024*3, NULL, configMAX_PRIORITIES - 11, &xHandle_Frame_Tx);
+    xTaskCreate(transmit_Frame_task, FRAME_TX_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_Frame_Tx);
     configASSERT(xHandle_Frame_Tx);
 
     // ACK in Process Task - ACK reply pumped out onto a queue
-    xTaskCreate(process_ACK_task, ACK_PROCESS_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES - 8, &xHandle_ACK_Process);
+    xTaskCreate(process_ACK_task, ACK_PROCESS_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_ACK_Process);
     configASSERT(xHandle_ACK_Process);
 
     // ACK Reply Task - held with ACK Queue until data is available
-    xTaskCreate(reply_ACK_task, ACK_REPLY_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES - 9, &xHandle_ACK_Reply);
+    xTaskCreate(reply_ACK_task, ACK_REPLY_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_ACK_Reply);
     configASSERT(xHandle_ACK_Reply);
 
     // Audio In Task - Process audio parameters
-    xTaskCreate(audio_IN_task, AUDIO_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES - 7, &xHandle_Audio_in_task);
+    xTaskCreate(audio_IN_task, AUDIO_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_Audio_in_task);
     configASSERT(xHandle_Audio_in_task);
 
 }

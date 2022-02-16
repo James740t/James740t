@@ -360,8 +360,8 @@ void mqtt_app_init(void)
     }
 
     // Start the MQTT tasks here :
-    xTaskCreate(mqtt_rx_task, MQTT_RX_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES-4, &xHandle_rx_mqtt);
-    xTaskCreate(mqtt_tx_task, MQTT_TX_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES-6, &xHandle_tx_mqtt);
+    xTaskCreate(mqtt_rx_task, MQTT_RX_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_rx_mqtt);
+    xTaskCreate(mqtt_tx_task, MQTT_TX_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_tx_mqtt);
 
     //All initialised - give the wifi semaphore back
     xSemaphoreGive(bin_s_sync_wifi_connected);

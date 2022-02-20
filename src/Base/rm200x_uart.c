@@ -5,8 +5,9 @@
 /******************************************************************************************/
 
 //FREERTOS CONTROL ITEMS
-SemaphoreHandle_t bin_s_sync_uart_tx_task = NULL;
-SemaphoreHandle_t bin_s_sync_uart_rx_process_task = NULL;
+//SemaphoreHandle_t bin_s_sync_uart_tx_task = NULL;
+//SemaphoreHandle_t bin_s_sync_uart_rx_process_task = NULL;
+SemaphoreHandle_t xSemUART_rate_control = NULL;
 
 TaskHandle_t xHandle_uart_tx = NULL;
 TaskHandle_t xHandle_uart_rx = NULL;
@@ -32,28 +33,41 @@ bool HEX_DELIMITED = true;
 
 bool PATTERN_0xFF_DETECTED = false;
 
+static TimerHandle_t tx_rate_timer = NULL;
+static int tx_delay_ms = UART_FIXED_MIN_TX_DELAY_MS;
+
 //Local prototypes
+void rekease_tx_callback(TimerHandle_t xTimer);
 void rx_uart_task(void *arg);
 void tx_uart_task(void *arg);
 void uart_event_task(void *pvParameters);
 
-//#define STACK_MONITOR   1
-#ifdef STACK_MONITOR
+#define STACK_MONITOR   false
+#if STACK_MONITOR
 UBaseType_t uxHighWaterMark_RX;
 UBaseType_t uxHighWaterMark_TX;
 UBaseType_t uxHighWaterMark_EV;
 #endif
 
-        // #ifdef STACK_MONITOR
+        // #if STACK_MONITOR
         //     /* Inspect our own high water mark on entering the task. */
         //     uxHighWaterMark_RX = uxTaskGetStackHighWaterMark( NULL );
         //     printf("MQTT RX STACK HW (START) = %d\r\n", uxHighWaterMark_RX);
         // #endif
 
-        // #ifdef STACK_MONITOR
+        // #if STACK_MONITOR
         //     uxHighWaterMark_RX = uxTaskGetStackHighWaterMark( NULL );
         //     printf("MQTT RX STACK HW (RUN): %d\r\n", uxHighWaterMark_RX);
         // #endif
+
+/******************************************************************************************/
+// Timer Callbacks
+/******************************************************************************************/
+void release_tx_callback(TimerHandle_t xTimer)
+{
+    // Give the semaphore back to release the UART Tx task to send the next message
+    xSemaphoreGive(xSemUART_rate_control);
+}
 
 /******************************************************************************************/
 // Helpers
@@ -253,7 +267,9 @@ int BytesToHexString(char *pt_out_str, const uint8_t *pt_in_bytes, const uint8_t
 
 void init_uart(void) 
 {
-    const uart_config_t uart_config = {
+    // Set up the UART port
+    const uart_config_t uart_config = 
+    {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,          // 8
         .parity = UART_PARITY_DISABLE,          // N
@@ -276,13 +292,24 @@ void init_uart(void)
     // Set UART pins
     uart_set_pin(EX_UART_NUM, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
-    // // Setup the Rx and Tx Logging levels
-    // // Do this here rather than at the task creation line...
-    // esp_log_level_set(TX_TASK_TAG, ESP_LOG_INFO);
-    // esp_log_level_set(RX_TASK_TAG, ESP_LOG_INFO);
-    // esp_log_level_set(UART_ISR_TASK_TAG, ESP_LOG_INFO);
+    tx_delay_ms = UART_FIXED_MIN_TX_DELAY_MS + UART_VARIABLE_TX_DELAY;
+    TickType_t uart_tx_delay = tx_delay_ms / portTICK_PERIOD_MS;
+    // Create a one-shot timer
+    tx_rate_timer = xTimerCreate(
+                      "One-shot timer",         // Name of timer
+                      uart_tx_delay,            // Period of timer (in ticks)
+                      pdFALSE,                  // Auto-reload
+                      (void *)1,                // Timer ID
+                      release_tx_callback);     // Callback function
     
+    // Setup all necessary queues:
+    // UART TX buffer Queue - Messages to be sent
+    xqUART_tx = xQueueCreate(UART_TX_QUEUE_DEPTH, sizeof(uart_message_t));
+    // UART RX buffer Queue - Mesages received
+    xqUART_rx = xQueueCreate(UART_RX_QUEUE_DEPTH, sizeof(uart_message_t));
 
+    // Create the semaphores
+    xSemUART_rate_control = xSemaphoreCreateBinary();
     // Start the tasks running here:
     // Tx Task - held with TX Queue data available
     xTaskCreate(tx_uart_task, TX_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_uart_tx);
@@ -296,7 +323,7 @@ void init_uart(void)
 
 void tx_uart_task(void *arg)
 {
-#ifdef STACK_MONITOR
+#if STACK_MONITOR
     /* Inspect our own high water mark on entering the task. */
     uxHighWaterMark_TX = uxTaskGetStackHighWaterMark(NULL);
     printf("UART TX STACK HW (START) = %d\r\n", uxHighWaterMark_TX);
@@ -315,9 +342,6 @@ void tx_uart_task(void *arg)
 
     int txBytes;
 
-    // UART TX buffer Queue
-    xqUART_tx = xQueueCreate(UART_TX_QUEUE_DEPTH, sizeof(uart_message_t));
-    
     while (1) 
     {
         //Clear the byte send buffer and binary length ready for the next message
@@ -349,9 +373,6 @@ void tx_uart_task(void *arg)
             // Flash LED to show activity
             xSemaphoreGive(bin_s_sync_blink_task);
 
-            // Block / hold task for a fixed minimum time to prevent the receiver being overrun... (RM200x)
-            int tx_delay_ms = UART_FIXED_MIN_TX_DELAY_MS + UART_VARIABLE_TX_DELAY;
-                vTaskDelay(tx_delay_ms / portTICK_PERIOD_MS);    //5 ms for now
             // Log if necessary
             ESP_LOGI(TX_TASK_TAG, "UART TX - ID: %d, Port: %d, Data length: %d, Message dwell: %d mS\r\nData: %s", 
                 tx_message->Message_ID, tx_message->port, tx_message->length, tx_delay_ms, tx_message->data);
@@ -366,8 +387,20 @@ void tx_uart_task(void *arg)
                 //clear the error flag
                 tx_error = false;
             }
+
+            // Wait for a period of time before allowing a new message to be sent
+            // update the timer period if required
+            tx_delay_ms = UART_FIXED_MIN_TX_DELAY_MS + UART_VARIABLE_TX_DELAY;
+            TickType_t uart_tx_delay = tx_delay_ms / portTICK_PERIOD_MS;
+            //Update the next one shot value - for throttling
+            xTimerChangePeriod(tx_rate_timer, uart_tx_delay, 0);
+            // Start timer (if timer is already running, this will act as
+            // xTimerReset() instead)
+            xTimerStart(tx_rate_timer, portMAX_DELAY);
+            // Wait until the timer releases the semaphore
+            //xSemaphoreTake(xSemUART_rate_control, portMAX_DELAY);
         }
-        #ifdef STACK_MONITOR
+        #if STACK_MONITOR
             uxHighWaterMark_TX = uxTaskGetStackHighWaterMark( NULL );
             printf("UART TX STACK HW (RUN): %d\r\n", uxHighWaterMark_TX);
         #endif
@@ -379,7 +412,7 @@ void tx_uart_task(void *arg)
 
 void rx_uart_task(void *arg)
 {
-#ifdef STACK_MONITOR
+#if STACK_MONITOR
     /* Inspect our own high water mark on entering the task. */
     uxHighWaterMark_RX = uxTaskGetStackHighWaterMark(NULL);
     printf("UART RX STACK HW (START) = %d\r\n", uxHighWaterMark_RX);
@@ -401,9 +434,6 @@ void rx_uart_task(void *arg)
 
     char rx_string[UART_BUFFER_SIZE];
 
-    // UART IO buffer Queues
-    xqUART_rx = xQueueCreate(UART_RX_QUEUE_DEPTH, sizeof(uart_message_t));
-
     while (1)
     {
         // Clear the input container ready for a new message
@@ -411,6 +441,8 @@ void rx_uart_task(void *arg)
         // Will block until a message is put on the queue
         if (xQueueReceive(xqUART_rx, rx_message, (TickType_t)portMAX_DELAY) == pdPASS)
         {
+            ESP_LOG_BUFFER_HEXDUMP(RX_TASK_TAG, &rx_message->data, strlen(rx_message->data), ESP_LOG_WARN);
+
             // Choose if ASCII or binary (HEX)
             // If first char is 0xFF - it will be a hex string coming in (radio application)
             if (rx_message->data[0] == 0xFF)
@@ -515,7 +547,7 @@ void rx_uart_task(void *arg)
                 }
             }
         }
-#ifdef STACK_MONITOR
+#if STACK_MONITOR
         uxHighWaterMark_RX = uxTaskGetStackHighWaterMark(NULL);
         printf("UART RX STACK HW (RUN): %d\r\n", uxHighWaterMark_RX);
 #endif
@@ -527,7 +559,7 @@ void rx_uart_task(void *arg)
 
 void uart_event_task(void *pvParameters)
 {
-#ifdef STACK_MONITOR
+#if STACK_MONITOR
     /* Inspect our own high water mark on entering the task. */
     uxHighWaterMark_EV = uxTaskGetStackHighWaterMark(NULL);
     printf("UART EV STACK HW (START) = %d\r\n", uxHighWaterMark_EV);
@@ -535,14 +567,12 @@ void uart_event_task(void *pvParameters)
 
     uart_event_t event;
     uart_message_t tmp_rx;
-    uint8_t *dtmp = (uint8_t *)malloc(UART_BUFFER_SIZE + 1);
 
     while (1)
     {
         // bzero(dtmp, UART_BUFFER_SIZE);
         // Clear all local buffers / containers ready for the next event
         memset(&tmp_rx, 0x00, sizeof(uart_message_t));
-        memset(dtmp, 0x00, sizeof(*dtmp));
 
         // Waiting for UART event.
         if (xQueueReceive(xqUART_events, (void *)&event, (portTickType)portMAX_DELAY))
@@ -556,23 +586,14 @@ void uart_event_task(void *pvParameters)
             be full.*/
             case UART_DATA:
                 ESP_LOGI(UART_ISR_TASK_TAG, "[UART DATA]: %d", event.size);
-                
-                if (xqUART_rx != NULL)
-                {
-                    // Clear buffer
-                    memset(&tmp_rx, 0x00, sizeof(uart_message_t));
-                    // Read in the available data
-                    tmp_rx.length = uart_read_bytes(EX_UART_NUM, &tmp_rx.data, event.size, UART_RX_READ_TIMEOUT_MS / portTICK_PERIOD_MS);   // (TickType_t)portMAX_DELAY);
-                    tmp_rx.port = EX_UART_NUM;
-                    // Send out on to the RX queue - for further processing (don't wait for the buffer to be free)
-                    ESP_LOG_BUFFER_HEXDUMP(UART_ISR_TASK_TAG, &tmp_rx.data, tmp_rx.length, ESP_LOG_INFO);
-                    xQueueSend(xqUART_rx, &tmp_rx, (TickType_t)0);
-                }
-                else
-                {
-                    //Flush the RX buffer to keep it clean
-                    uart_flush_input(EX_UART_NUM);
-                }
+                // Clear buffer
+                //memset(&tmp_rx, 0x00, sizeof(uart_message_t));
+                // Read in the available data
+                tmp_rx.length = uart_read_bytes(EX_UART_NUM, &tmp_rx.data, event.size, UART_RX_READ_TIMEOUT_MS / portTICK_PERIOD_MS);   // (TickType_t)portMAX_DELAY);
+                tmp_rx.port = EX_UART_NUM;
+                // Send out on to the RX queue - for further processing (don't wait for the buffer to be free)
+                ESP_LOG_BUFFER_HEXDUMP(UART_ISR_TASK_TAG, &tmp_rx.data, tmp_rx.length, ESP_LOG_INFO);
+                xQueueSend(xqUART_rx, &tmp_rx, (TickType_t)0);
                 break;
             // Event of HW FIFO overflow detected
             case UART_FIFO_OVF:
@@ -637,13 +658,12 @@ void uart_event_task(void *pvParameters)
                 break;
             }
         }
-#ifdef STACK_MONITOR
+#if STACK_MONITOR
         uxHighWaterMark_EV = uxTaskGetStackHighWaterMark(NULL);
         printf("UART EV STACK HW (RUN): %d\r\n", uxHighWaterMark_EV);
 #endif
     }
-    free(dtmp);
-    dtmp = NULL;
+
     free(xqUART_events);
     vTaskDelete(xHandle_uart_isr);
 }

@@ -217,7 +217,7 @@ uint8_t SendFrame(uint8_t *p_frame_array, uint8_t p_port)
     {
         // Send it to the TX Queue
         ESP_LOG_BUFFER_HEXDUMP(FRAME_TX_TAG, &(tx_uart->data), tx_uart->length, ESP_LOG_WARN);
-        xQueueSend(xqUART_tx, tx_uart, (TickType_t)0);
+        xQueueSend(xqUART_tx, tx_uart, (TickType_t)10);
     }
     else
     {
@@ -236,7 +236,7 @@ void init_rm200x_application(void)
     // SETUP REPORTING LEVELS
     // Frame Module
     esp_log_level_set(FRAME_RX_TAG, ESP_LOG_ERROR);
-    esp_log_level_set(FRAME_TX_TAG, ESP_LOG_ERROR);
+    esp_log_level_set(FRAME_TX_TAG, ESP_LOG_INFO);
     esp_log_level_set(PROTOCOL_TAG, ESP_LOG_INFO);
     // ACK Module
     esp_log_level_set(ACK_REPLY_TASK_TAG, ESP_LOG_NONE);

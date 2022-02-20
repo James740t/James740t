@@ -164,7 +164,7 @@ void send_to_uart(const char *pt_message, uint16_t p_length)
     }
     memcpy(&uart_tx_msg.data, pt_message, uart_tx_msg.length); // Only copy what will fit...
     // Place our data on the UART tx queue
-    xQueueSend(xqUART_tx, &uart_tx_msg, (TickType_t) 0);
+    xQueueSend(xqUART_tx, &uart_tx_msg, (TickType_t) 10);
 
     if(counter >= UINT8_MAX)
     {

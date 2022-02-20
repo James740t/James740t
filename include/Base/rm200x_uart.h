@@ -14,6 +14,7 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
+#include "freertos/timers.h"
 
 //ESP Headers
 #include "esp_log.h"
@@ -41,8 +42,8 @@ extern "C" {
 #define INCLUDE_vTaskSuspend    1
 
 //FREERTOS ITEMS
-extern SemaphoreHandle_t bin_s_sync_uart_tx_task;
-extern SemaphoreHandle_t bin_s_sync_uart_rx_process_task;
+//extern SemaphoreHandle_t bin_s_sync_uart_tx_task;
+//extern SemaphoreHandle_t bin_s_sync_uart_rx_process_task;
 
 extern TaskHandle_t xHandle_uart_tx;
 extern TaskHandle_t xHandle_uart_rx;
@@ -61,11 +62,11 @@ extern const char *UART_ISR_TASK_TAG;
 //UART
 #define EX_UART_NUM                     UART_NUM_2
 #define UART_BUFFER_SIZE                    1024
-#define UART_RX_READ_TIMEOUT_MS             3
-#define UART_RX_QUEUE_DEPTH                 16
-#define UART_TX_QUEUE_DEPTH                 16
-#define UART_EVENT_QUEUE_DEPTH              16
-#define UART_FIXED_MIN_TX_DELAY_MS          5
+#define UART_RX_READ_TIMEOUT_MS             0
+#define UART_RX_QUEUE_DEPTH                 32
+#define UART_TX_QUEUE_DEPTH                 32
+#define UART_EVENT_QUEUE_DEPTH              32
+#define UART_FIXED_MIN_TX_DELAY_MS          20
 extern uint16_t UART_VARIABLE_TX_DELAY;
 
 // PATTERN DEFINITIONS

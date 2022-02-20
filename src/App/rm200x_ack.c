@@ -107,7 +107,7 @@ uint8_t Create_ACK_Reply_UART(const uint8_t *pt_frame_in_array, uint8_t p_ack_st
     {
         // Send it to the TX Queue
         ESP_LOG_BUFFER_HEXDUMP(ACK_REPLY_TASK_TAG, &(tx_ack->data), tx_ack->length, ESP_LOG_WARN);
-        xQueueSend(xqUART_tx, tx_ack, (TickType_t)0);
+        xQueueSend(xqUART_tx, tx_ack, (TickType_t)10);
     }
 
     return check.byte;

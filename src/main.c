@@ -39,12 +39,12 @@ void app_main() //Called from an "internal" main.c
     // WIFI Module
 	esp_log_level_set(WIFI_TAG, ESP_LOG_ERROR);
     // MQTT Module
-	esp_log_level_set(MQTT_RX_TASK_TAG, ESP_LOG_INFO);
-    esp_log_level_set(MQTT_TX_TASK_TAG, ESP_LOG_INFO);
+	esp_log_level_set(MQTT_RX_TASK_TAG, ESP_LOG_ERROR);
+    esp_log_level_set(MQTT_TX_TASK_TAG, ESP_LOG_ERROR);
     // UART Module
-	esp_log_level_set(TX_TASK_TAG, ESP_LOG_NONE);
-    esp_log_level_set(RX_TASK_TAG, ESP_LOG_NONE);
-    esp_log_level_set(UART_ISR_TASK_TAG, ESP_LOG_NONE);
+	esp_log_level_set(TX_TASK_TAG, ESP_LOG_INFO);
+    esp_log_level_set(RX_TASK_TAG, ESP_LOG_ERROR);
+    esp_log_level_set(UART_ISR_TASK_TAG, ESP_LOG_ERROR);
     // GPIO Module
     esp_log_level_set(BLINK_TASK_TAG, ESP_LOG_NONE);
     // FS - File System Module

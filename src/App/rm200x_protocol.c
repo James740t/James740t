@@ -17,9 +17,50 @@ aupPowerState_t         intent_0x21_data;
 /******************************************************************************************/
 // HELPERS
 /******************************************************************************************/
+/** Print the value os a json object or array.
+  * @param json The handler of the json object or array. */
+static void json_dump( json_t const* json ) 
+{
+    jsonType_t const type = json_getType( json );
+    if ( type != JSON_OBJ && type != JSON_ARRAY ) 
+    {
+        ESP_LOGE(PROTOCOL_TAG, "BAD JSON");
+        return;
+    }
+
+    printf("%s", type == JSON_OBJ? " {": " [" );
+
+    json_t const* child;
+    for( child = json_getChild( json ); child != 0; child = json_getSibling( child ) ) 
+    {
+
+        jsonType_t propertyType = json_getType( child );
+        char const* name = json_getName( child );
+        if ( name ) printf(" \"%s\": ", name );
+
+        if ( propertyType == JSON_OBJ || propertyType == JSON_ARRAY )
+            json_dump( child );
+
+        else 
+        {
+            char const* value = json_getValue( child );
+            if ( value ) 
+            {
+                bool const text = JSON_TEXT == json_getType( child );
+                char const* fmt = text? " \"%s\"": " %s";
+                printf( fmt, value );
+                bool const last = !json_getSibling( child );
+                if ( !last ) printf(",");
+            }
+        }
+    }
+
+    printf("%s", type == JSON_OBJ? " }": " ]" );
+    printf("\r\n");
+}
 
 /******************************************************************************************/
-// PUBLIC FUNCTIONS
+// PUBLIC FUNCTIONS - STATUS MESSAGES - OUTPUTS (from the radio)
 /******************************************************************************************/
 char* intent_0x10_json(char *pt_str_json, uint8_t *frame)
 {
@@ -106,19 +147,107 @@ char *intent_0x21_json(char *pt_str_json, uint8_t *frame)
 
 uint8_t json_volume_set(char *p_str)
 {
-    json_t mem[32]; // Number of tokens
+    int vol = 0;
+    int bass = 0;
+    int middle = 0;
+    int treble = 0;
+    int balance = 0;
+    int fader = 0;
+    bool mute = false;
+    bool loudness = false;
+    bool smute = false;
+
+    ESP_LOG_BUFFER_HEXDUMP(PROTOCOL_TAG, p_str, strlen((char *)p_str), ESP_LOG_INFO);
+
+    // Setup a memory store for the parsed JSON string
+    json_t mem[JSON_MAX_NO_TOKENS]; // Number of tokens
+
     json_t const* json = json_create( p_str, mem, sizeof mem / sizeof *mem );
     if ( !json ) 
     {
         return 0xFF;
     }
 
-    json_t const* Volume = json_getProperty( json, "Volume" );
-    if ( !Volume || JSON_INTEGER != json_getType( Volume ) ) 
+    json_dump(json);
+
+     json_t const* Audio = json_getProperty( json, "0x10" );
+ 
+    if ( Audio && json_getType(Audio) == JSON_OBJ ) 
     {
-        return 0xFF;
+        // This an Audio message - decode it as such:
+
+        //INTEGER VALUES
+        json_t const *Volume = json_getProperty( Audio, "Volume" );
+        if ( Volume && json_getType(Volume) == JSON_INTEGER )
+        {
+            vol = (int)json_getInteger( Volume );
+            ESP_LOGI(PROTOCOL_TAG, "Volume \t: %d", vol);
+        }
+        
+        //BOOLEAN VALUES
+        json_t const *Mute = json_getProperty( Audio, "Mute" );
+        if ( Mute && json_getType(Mute) == JSON_BOOLEAN )
+        {
+            mute = (int)json_getBoolean( Mute );
+            ESP_LOGI(PROTOCOL_TAG, "Mute \t: %s", mute ? "true" : "false");
+        }
     }
-    int const vol = (int)json_getInteger( Volume );
+
+     json_t const* Tone = json_getProperty( json, "0x11" );
+ 
+    if ( Tone && json_getType(Tone) == JSON_OBJ ) 
+    {
+        // This an Audio message - decode it as such:
+
+        //INTEGER VALUES
+        json_t const *Bass = json_getProperty( Tone, "Bass" );
+        if ( Bass && json_getType(Bass) == JSON_INTEGER )
+        {
+            bass = (int)json_getInteger( Bass );
+            ESP_LOGI(PROTOCOL_TAG, "Bass \t: %d", bass);
+        }
+        json_t const *Middle = json_getProperty( Tone, "Middle" );
+        if ( Middle && json_getType(Middle) == JSON_INTEGER )
+        {
+            middle = (int)json_getInteger( Middle );
+            ESP_LOGI(PROTOCOL_TAG, "Middle \t: %d", middle);
+        }
+        json_t const *Treble = json_getProperty( Tone, "Treble" );
+        if ( Treble && json_getType(Treble) == JSON_INTEGER )
+        {
+            treble = (int)json_getInteger( Treble );
+            ESP_LOGI(PROTOCOL_TAG, "Treble \t: %d", treble);
+        }
+        json_t const *Balance = json_getProperty( Tone, "Balance" );
+        if ( Balance && json_getType(Balance) == JSON_INTEGER )
+        {
+            balance = (int)json_getInteger( Balance );
+            ESP_LOGI(PROTOCOL_TAG, "Balance \t: %d", balance);
+        }
+        json_t const *Fader = json_getProperty( Tone, "Fader" );
+        if ( Fader && json_getType(Fader) == JSON_INTEGER )
+        {
+            fader = (int)json_getInteger( Fader );
+            ESP_LOGI(PROTOCOL_TAG, "Fader \t: %d", fader);
+        }
+
+        //BOOLEAN VALUES
+        json_t const *SMute = json_getProperty( Tone, "SoftMute" );
+        if ( SMute && json_getType(SMute) == JSON_BOOLEAN )
+        {
+            smute = (int)json_getBoolean( SMute );
+            ESP_LOGI(PROTOCOL_TAG, "SoftMute \t: %s", smute ? "true" : "false");
+        }
+        json_t const *Loudness = json_getProperty( Tone, "Loudness" );
+        if ( Loudness && json_getType(Loudness) == JSON_BOOLEAN )
+        {
+            loudness = (int)json_getBoolean( Loudness );
+            ESP_LOGI(PROTOCOL_TAG, "Loudness \t: %s", loudness ? "true" : "false");
+        } 
+    }
+
+
+
 
     // build and send frame
     static uint8_t _dat[2];
@@ -135,24 +264,19 @@ uint8_t json_volume_set(char *p_str)
     }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-    json_t const* Mute = json_getProperty( json, "Mute" );
-    if ( !Mute || JSON_BOOLEAN != json_getType( Mute ) ) 
-    {
-        return 0xFF;
-    }
-    bool const mut = (bool)json_getBoolean( Mute );
 
     // build and send frame
     //static uint8_t _dat[2];
     //static uint8_t *pt_dat = _dat;
     _dat[0] = 0x02;
-    _dat[1] = mut ? 1 : 0;
+    _dat[1] = mute ? 1 : 0;
     
     //uint8_t err = 
     CreateSendFrame(0x90, _dat, 4);
 
     if(err)
     {
+        ESP_LOGE(PROTOCOL_TAG, "BAD FRAME - Error code: 0x%02X", err);
         ESP_LOG_BUFFER_HEXDUMP(PROTOCOL_TAG, p_str, strlen((char *)p_str), ESP_LOG_ERROR);
     }
 //////////////////////////////////////////////////////////////////////////////////////////////////////

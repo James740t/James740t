@@ -14,6 +14,8 @@
 #include "JSON/json-maker.h"
 #include "JSON/tiny-json.h"
 
+
+
 //ESP Headers
 
 //Base Headers
@@ -32,6 +34,7 @@ extern const char *PROTOCOL_TAG;
 
 // Definitions
 #define JSON_STRING_LENGTH      512
+#define JSON_MAX_NO_TOKENS      32
 
 //Frame store data
 extern aupAudio_t           intent_0x10_data;

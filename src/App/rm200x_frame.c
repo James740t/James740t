@@ -236,7 +236,7 @@ void init_rm200x_application(void)
     // SETUP REPORTING LEVELS
     // Frame Module
     esp_log_level_set(FRAME_RX_TAG, ESP_LOG_ERROR);
-    esp_log_level_set(FRAME_TX_TAG, ESP_LOG_INFO);
+    esp_log_level_set(FRAME_TX_TAG, ESP_LOG_ERROR);
     esp_log_level_set(PROTOCOL_TAG, ESP_LOG_INFO);
     // ACK Module
     esp_log_level_set(ACK_REPLY_TASK_TAG, ESP_LOG_NONE);
@@ -484,6 +484,8 @@ void transmit_Frame_task(void *arg)
     free(xqFrame_Tx);
     vTaskDelete(xHandle_Frame_Tx);
 }
+
+
 
 /******************************************************************************************/
 // RM200x FRAME -- END --

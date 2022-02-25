@@ -33,8 +33,10 @@ bool HEX_DELIMITED = true;
 
 bool PATTERN_0xFF_DETECTED = false;
 
-static TimerHandle_t tx_rate_timer = NULL;
 static int tx_delay_ms = UART_FIXED_MIN_TX_DELAY_MS;
+#if (TX_DWELL_ENABLED)
+static TimerHandle_t tx_rate_timer = NULL;
+#endif
 
 //Local prototypes
 void rekease_tx_callback(TimerHandle_t xTimer);
@@ -42,7 +44,11 @@ void rx_uart_task(void *arg);
 void tx_uart_task(void *arg);
 void uart_event_task(void *pvParameters);
 
-#define STACK_MONITOR   false
+// Enable a fixed + variable dwell time between concecutive
+// UART messages - used to throttle demand on the RM200x
+#define TX_DWELL_ENABLED    false
+
+#define STACK_MONITOR       false
 #if STACK_MONITOR
 UBaseType_t uxHighWaterMark_RX;
 UBaseType_t uxHighWaterMark_TX;
@@ -292,6 +298,7 @@ void init_uart(void)
     // Set UART pins
     uart_set_pin(EX_UART_NUM, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
+#if (TX_DWELL_ENABLED)
     tx_delay_ms = UART_FIXED_MIN_TX_DELAY_MS + UART_VARIABLE_TX_DELAY;
     TickType_t uart_tx_delay = tx_delay_ms / portTICK_PERIOD_MS;
     // Create a one-shot timer
@@ -301,7 +308,7 @@ void init_uart(void)
                       pdFALSE,                  // Auto-reload
                       (void *)1,                // Timer ID
                       release_tx_callback);     // Callback function
-    
+#endif    
     // Setup all necessary queues:
     // UART TX buffer Queue - Messages to be sent
     xqUART_tx = xQueueCreate(UART_TX_QUEUE_DEPTH, sizeof(uart_message_t));
@@ -388,6 +395,7 @@ void tx_uart_task(void *arg)
                 tx_error = false;
             }
 
+#if (TX_DWELL_ENABLED)
             // Wait for a period of time before allowing a new message to be sent
             // update the timer period if required
             tx_delay_ms = UART_FIXED_MIN_TX_DELAY_MS + UART_VARIABLE_TX_DELAY;
@@ -398,7 +406,9 @@ void tx_uart_task(void *arg)
             // xTimerReset() instead)
             xTimerStart(tx_rate_timer, portMAX_DELAY);
             // Wait until the timer releases the semaphore
-            //xSemaphoreTake(xSemUART_rate_control, portMAX_DELAY);
+            xSemaphoreTake(xSemUART_rate_control, portMAX_DELAY);
+#endif
+            // Loop around
         }
         #if STACK_MONITOR
             uxHighWaterMark_TX = uxTaskGetStackHighWaterMark( NULL );

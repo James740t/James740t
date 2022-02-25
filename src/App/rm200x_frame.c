@@ -242,7 +242,8 @@ void init_rm200x_application(void)
     esp_log_level_set(ACK_REPLY_TASK_TAG, ESP_LOG_NONE);
     esp_log_level_set(ACK_PROCESS_TASK_TAG, ESP_LOG_NONE);
     // Audio Module
-    esp_log_level_set(AUDIO_TASK_TAG, ESP_LOG_WARN);
+    esp_log_level_set(RADIO_STATUS_TASK_TAG, ESP_LOG_ERROR);
+    esp_log_level_set(RADIO_COMMAND_TASK_TAG, ESP_LOG_ERROR);
 
     // SETUP ALL QUEUES
     // Setup the frame Rx Queue
@@ -277,7 +278,7 @@ void init_rm200x_application(void)
     configASSERT(xHandle_ACK_Reply);
 
     // Audio In Task - Process audio parameters
-    xTaskCreate(audio_IN_task, AUDIO_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_Audio_in_task);
+    xTaskCreate(protocol_rm200x_input_task, RADIO_COMMAND_TASK_TAG, 1024*3, NULL, configMAX_PRIORITIES, &xHandle_Audio_in_task);
     configASSERT(xHandle_Audio_in_task);
 
 }
@@ -399,7 +400,7 @@ void transmit_Frame_task(void *arg)
     int err = 0;
     int _len = 0;
 
-    static uint8_t _incomming[FRAME_TX_BUFFER];
+    static uint8_t _incomming[UART_BUFFER_SIZE];
     static uint8_t *incomming = _incomming;
     memset(incomming, 0x00, sizeof(_incomming));
 
@@ -421,7 +422,8 @@ void transmit_Frame_task(void *arg)
             if ((incomming[0] == 0xFF) && (incomming[1] == 0x55))
             {
                 // treat it like a frame
-                err = SendFrame(incomming, FRAME_PORT);
+                memcpy(frame, incomming, sizeof(_frame));
+                err = SendFrame(frame, FRAME_PORT);
                 if (err)
                 {
                     ESP_LOG_BUFFER_HEXDUMP(FRAME_TX_TAG, incomming, strlen((char *)incomming), ESP_LOG_ERROR);
@@ -458,17 +460,11 @@ void transmit_Frame_task(void *arg)
                     )
                 {
                     // Extract the intent structure and the process it.
-                    err = json_volume_set((char *)incomming);
+                    err = protocol_command_json_process((char *)incomming);
                     if (err)
                     {
                         ESP_LOG_BUFFER_HEXDUMP(FRAME_TX_TAG, incomming, strlen((char *)incomming), ESP_LOG_ERROR);
                     }
-                    // err = json_mute_set((char *)incomming);
-                    // if (err)
-                    // {
-                    //     ESP_LOG_BUFFER_HEXDUMP(FRAME_TX_TAG, incomming, strlen((char *)incomming), ESP_LOG_ERROR);
-                    // }
-
                 }
             }
 

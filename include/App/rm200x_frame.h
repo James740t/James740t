@@ -24,7 +24,7 @@
 //Application Headers
 #include "App/rm200x_frame_definitions.h"
 #include "App/rm200x_ack.h"
-#include "App/rm200x_radio_status.h"
+#include "App/rm200x_protocol.h"
 
 //FREERTOS CONTROL ITEMS
 #define INCLUDE_vTaskSuspend    1

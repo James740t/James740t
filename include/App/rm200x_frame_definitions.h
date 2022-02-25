@@ -4,6 +4,52 @@
 #define __RM200X_FRAME_DEFINITIONS_H__
 
 /******************************************************************************************/
+// MODERN INTENT DEFINES (2022)
+/******************************************************************************************/
+
+enum AUDIO_0x90
+{
+    K_NONE = 0x00,
+    K_POWER,        // Plus POWER enum
+    K_MUTE,         // Plus ON_OFF enum
+    K_EQ,           // Plus EQ enum
+    K_FADE,         // Data ranges between -7 to +7 (use 0 to 14 and decode)
+    K_BALANCE,      // Data ranges between -7 to +7 (use 0 to 14 and decode)
+    K_BASS,         // Data ranges between -7 to +7 (use 0 to 14 and decode)
+    K_MIDDLE,       // Data ranges between -7 to +7 (use 0 to 14 and decode)
+    K_TREBLE,       // Data ranges between -7 to +7 (use 0 to 14 and decode)
+    K_VOLUME,       // Data ranges between 0 and 100 (different radios have different limits)
+    K_LOUDNESS,     // Plus ON_OFF enum
+    K_CAN_SIDE_ACC  // Plus POWER enum
+};
+
+enum RADIO_0x90
+{
+    K_RADIO_BAND = 0x20, // Plus BAND enum
+    K_RADIO_SOFT_MUTE,   // Plus ON_OFF enum
+    K_RADIO_HFP,         // Data byte is cab number 0 to 255
+    K_SEEK_UP,
+    K_SEEK_DOWN,
+    K_RADIO_RESERVED,     // Plus ON_OFF enum
+    K_RADIO_PTY_RDS_TYPE, // Data follows US_RBDS standard 0-31
+    K_RADIO_AF_CONTROL,   // Plus ON_OFF enum
+    K_RADIO_TA_CONTROL,   // Plus ON_OFF enum
+    K_RADIO_CT_CONTROL,   // Plus ON_OFF enum
+    K_RADIO_LOC_CONTROL,  // Plus ON_OFF enum
+    K_RADIO_REGION,       // Plus REGIONGET enum
+    K_RADIO_BEEP,         // Plus ON_OFF enum
+    K_RADIO_RESET,        // Plus ON_OFF enum
+    K_RADIO_12_24_HR,     // Plus CLOCK_MODE enum
+    K_RADIO_TONE,         // Play a preset tone # 0 to 255
+
+    K_RADIO_RDS_CONTROL, // RDS 0: OFF;1:ON
+    K_RADIO_TUNE_DOWN,
+    K_RADIO_TUNE_UP,
+    K_RADIO_ILLUMINATION,  // Illumination brightness. If not variable 0<49% Illumination OFF, >=50% Illumination ON
+    K_BEEP_GENERATE = 0x36 // value 0 255 0 cancel (silent immediately) 1 beep 25mS 2 beep 50mS 80 beep 2 seconds(limit) Values > 80 generates 2 seconds
+};
+
+/******************************************************************************************/
 // INTENT DEFINES
 /******************************************************************************************/
 //----- Intent name                intent/hex   Index(dec)

@@ -49,6 +49,118 @@ enum RADIO_0x90
     K_BEEP_GENERATE = 0x36 // value 0 255 0 cancel (silent immediately) 1 beep 25mS 2 beep 50mS 80 beep 2 seconds(limit) Values > 80 generates 2 seconds
 };
 
+enum MEDIA_KEY
+{
+    K_PLAY_PAUSE = 0x80, // 16-Bit ID option for data - if null play first available track
+    K_STOP,
+    K_NEXT,
+    K_PREVIOUS,
+    K_VOICE_CONTROL,
+    K_FFWD,
+    KFRWD,
+    K_LIST_NEXT, // in media or BT modes scrolls to next item - doesn't select until "ENTER"
+    K_LIST_PREVIOUS
+};
+
+enum BT_KEY
+{
+    K_BT_0 = 0xA0,
+    K_BT_1,
+    K_BT_2,
+    K_BT_3,
+    K_BT_4,
+    K_BT_5,
+    K_BT_6,
+    K_BT_7,
+    K_BT_8,
+    K_BT_9,
+    K_BT_HASH,
+    K_BT_ASTRIX,
+    K_BT_PLUS,
+    K_BT_ANSWER_MACHINE,
+    K_BT_ENTER,
+    K_BT_CLEAR,
+    K_BT_VOLUME_UP,
+    K_BT_VOLUME_DOWN,
+    K_BT_VOLUME_SET, // Byte value level between 0% and 100% in 1% increments
+    K_BT_MENU_SELECT,
+    K_BT_MENU_UP,
+    K_BT_MENU_DOWN,
+    K_BT_MENU_LEFT,
+    K_BT_MENU_RIGHT,
+    K_BT_POWER,
+    K_BT_UNPAIR,
+    K_BT_CONNECT,
+    K_BT_A2DP,
+    K_BT_HFP,
+    K_BT_HSP,
+    K_BT_SEARCH_DEVICES,
+    K_BT_DELETE_DEVICES,
+    K_BT_PHONE_NUMBER,
+    K_BT_DISCONNECT,
+
+    K_BT_A2DP_SW = 0xC3,
+    K_BT_A2DP_BOOST,
+
+    K_BT_PB_DOWNLOAD = 0xC5
+};
+
+enum PANEL_KEY
+{
+    K_PANEL_ROTARY_UP = 0x50,
+    K_PANEL_ROTARY_DOWN = 0x51,
+    K_PANEL_ROTARY_PUSH = 0x52,
+    K_PANEL_SRC_FWD = 0x53,
+    K_PANEL_BAND = 0x54,
+    K_PANEL_PREV = 0x55,
+    K_PANEL_NEXT = 0x56,
+    K_PANEL_AF = 0x57,
+    K_PANEL_MENU = 0x58,
+    K_PANEL_KEY_1 = 0x59,
+    K_PANEL_KEY_2 = 0x5A,
+    K_PANEL_KEY_3 = 0x5B,
+    K_PANEL_KEY_4 = 0x5C,
+    K_PANEL_KEY_5 = 0x5D,
+    K_PANEL_KEY_6 = 0x5E,
+    K_PANEL_EJECT = 0x5F,
+    K_PANEL_ANSWER = 0x60,
+    K_PANEL_HANGUP = 0x61,
+    K_PANEL_INFO = 0x62,
+    K_PANEL_SRC_BACK = 0x63,
+    K_PANEL_KEY_7 = 0x64,
+    K_PANEL_KEY_8 = 0x65,
+    K_PANEL_KEY_9 = 0x66,
+    K_PANEL_KEY_10 = 0x67,
+    K_PANEL_KEY_11 = 0x68,
+    K_PANEL_KEY_12 = 0x69,
+    K_PANEL_KEY_13 = 0x6A,
+    K_PANEL_KEY_14 = 0x6B,
+    K_PANEL_KEY_15 = 0x6C,
+    K_PANEL_KEY_16 = 0x6D,
+    K_PANEL_KEY_17 = 0x6E,
+    K_PANEL_KEY_18 = 0x6F
+};
+
+enum DAB_KEY
+{
+    K_DAB_SCAN = 0x70,
+    K_DAB_SCAN_CANCEL,
+    K_DAB_PREV_SERVICE,
+    K_DAB_NEXT_SERVICE,
+    K_DAB_SHOW_FREQ,
+    K_DAB_SHOW_SERVICE,
+    K_DAB_SHOW_ENSEMBLE,
+    K_DAB_SHOW_PTY,
+    K_DAB_SHOW_DLS,
+    K_DAB_PRUNE
+};
+
+enum Key_Press
+{
+    PRESS_SHORT = 0x00,
+    PRESS_LONG = 0x01
+};
+
 /******************************************************************************************/
 // INTENT DEFINES
 /******************************************************************************************/

@@ -39,7 +39,7 @@ static TimerHandle_t tx_rate_timer = NULL;
 #endif
 
 //Local prototypes
-void rekease_tx_callback(TimerHandle_t xTimer);
+void release_tx_callback(TimerHandle_t xTimer);
 void rx_uart_task(void *arg);
 void tx_uart_task(void *arg);
 void uart_event_task(void *pvParameters);
